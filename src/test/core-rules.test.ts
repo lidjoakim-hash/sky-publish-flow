@@ -122,3 +122,14 @@ describe("audio levels", () => {
     expect(mp4HasSoundTrack(new Uint8Array([...hdlr("vide"), ...hdlr("soun")]))).toBe(true);
   });
 });
+
+import { assignSchedule as assignNoClash } from "@/lib/schedule";
+describe("schedule never doubles up a slot", () => {
+  it("post time equal to Reel time does not collide", () => {
+    const r = assignNoClash(
+      [{ id: "p1", kind: "post" }, { id: "r1", kind: "reel" }],
+      { startDate: "2030-01-01", postTimes: ["19:00"], reelTime: "19:00", taken: new Set(), notBefore: new Date("2029-01-01") },
+    );
+    expect(r.get("p1")).not.toBe(r.get("r1"));
+  });
+});
