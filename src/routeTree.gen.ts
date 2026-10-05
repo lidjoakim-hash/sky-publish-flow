@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated/import'
 import { Route as ApiPublicCronPublishRouteImport } from './routes/api/public/cron/publish'
 import { Route as ApiPublicWorkerClaimRouteImport } from './routes/api/public/worker/claim'
 import { Route as ApiPublicWorkerUpdateRouteImport } from './routes/api/public/worker/update'
@@ -18,6 +20,15 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedImportRoute = AuthenticatedImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const ApiPublicCronPublishRoute = ApiPublicCronPublishRouteImport.update({
   id: '/api/public/cron/publish',
@@ -37,12 +48,14 @@ const ApiPublicWorkerUpdateRoute = ApiPublicWorkerUpdateRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/import': typeof AuthenticatedImportRoute
   '/api/public/cron/publish': typeof ApiPublicCronPublishRoute
   '/api/public/worker/claim': typeof ApiPublicWorkerClaimRoute
   '/api/public/worker/update': typeof ApiPublicWorkerUpdateRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/import': typeof AuthenticatedImportRoute
   '/api/public/cron/publish': typeof ApiPublicCronPublishRoute
   '/api/public/worker/claim': typeof ApiPublicWorkerClaimRoute
   '/api/public/worker/update': typeof ApiPublicWorkerUpdateRoute
@@ -50,6 +63,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/_authenticated/import': typeof AuthenticatedImportRoute
   '/api/public/cron/publish': typeof ApiPublicCronPublishRoute
   '/api/public/worker/claim': typeof ApiPublicWorkerClaimRoute
   '/api/public/worker/update': typeof ApiPublicWorkerUpdateRoute
@@ -58,18 +73,22 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/import'
     | '/api/public/cron/publish'
     | '/api/public/worker/claim'
     | '/api/public/worker/update'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/import'
     | '/api/public/cron/publish'
     | '/api/public/worker/claim'
     | '/api/public/worker/update'
   id:
     | '__root__'
     | '/'
+    | '/_authenticated'
+    | '/_authenticated/import'
     | '/api/public/cron/publish'
     | '/api/public/worker/claim'
     | '/api/public/worker/update'
@@ -77,6 +96,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   ApiPublicCronPublishRoute: typeof ApiPublicCronPublishRoute
   ApiPublicWorkerClaimRoute: typeof ApiPublicWorkerClaimRoute
   ApiPublicWorkerUpdateRoute: typeof ApiPublicWorkerUpdateRoute
@@ -90,6 +110,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/import': {
+      id: '/_authenticated/import'
+      path: '/import'
+      fullPath: '/import'
+      preLoaderRoute: typeof AuthenticatedImportRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/api/public/cron/publish': {
       id: '/api/public/cron/publish'
@@ -115,8 +149,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedImportRoute: typeof AuthenticatedImportRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedImportRoute: AuthenticatedImportRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   ApiPublicCronPublishRoute: ApiPublicCronPublishRoute,
   ApiPublicWorkerClaimRoute: ApiPublicWorkerClaimRoute,
   ApiPublicWorkerUpdateRoute: ApiPublicWorkerUpdateRoute,
