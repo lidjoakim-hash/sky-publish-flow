@@ -93,6 +93,9 @@ export function assignSchedule<T extends SchedulableItem>(items: T[], opts: Sche
   const tz = opts.timeZone ?? "Europe/Oslo";
   const postTimes = opts.postTimes.length ? opts.postTimes : ["18:00"];
   const result = new Map<string, string>();
+  // Track slots assigned in this run too, so a post time equal to the Reel time (or a repeated
+  // post time) never puts two items in the same instant.
+  const taken = new Set(opts.taken);
   for (const kind of ["post", "reel"] as const) {
     let list = items.filter((i) => i.kind === kind);
     if (opts.topicMixing) list = mixTopics(list);
@@ -104,7 +107,8 @@ export function assignSchedule<T extends SchedulableItem>(items: T[], opts: Sche
         const slot = zonedToUtc(addDays(opts.startDate, day), time, tz);
         k++;
         const iso = slot.toISOString();
-        if (slot <= opts.notBefore || opts.taken.has(iso)) continue;
+        if (slot <= opts.notBefore || taken.has(iso)) continue;
+        taken.add(iso);
         result.set(item.id, iso);
         break;
       }
