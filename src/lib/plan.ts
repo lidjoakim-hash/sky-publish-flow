@@ -10,7 +10,7 @@ export interface PlanInput {
   assets: Asset[];
   pubs: Publication[];
   startDate: string;
-  postTime: string;
+  postTimes: string[];
   reelTime: string;
   timeZone: string;
   topicMixing: boolean;
@@ -34,6 +34,6 @@ export function planSchedule(i: PlanInput): Map<string, string> {
   const ordered = [...moving].sort((a, b) => Number(b.campaign_first) - Number(a.campaign_first) || a.sort_index - b.sort_index);
   return assignSchedule(
     ordered.map((a) => ({ id: a.id, kind: a.kind as "reel" | "post", topics: a.topics })),
-    { startDate: i.startDate, postTime: i.postTime.slice(0, 5), reelTime: i.reelTime.slice(0, 5), timeZone: i.timeZone, taken, notBefore: now, topicMixing: i.topicMixing },
+    { startDate: i.startDate, postTimes: i.postTimes.map((t) => t.slice(0, 5)), reelTime: i.reelTime.slice(0, 5), timeZone: i.timeZone, taken, notBefore: now, topicMixing: i.topicMixing },
   );
 }
