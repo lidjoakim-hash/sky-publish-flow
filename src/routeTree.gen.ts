@@ -10,33 +10,76 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiPublicCronPublishRouteImport } from './routes/api/public/cron/publish'
+import { Route as ApiPublicWorkerClaimRouteImport } from './routes/api/public/worker/claim'
+import { Route as ApiPublicWorkerUpdateRouteImport } from './routes/api/public/worker/update'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicCronPublishRoute = ApiPublicCronPublishRouteImport.update({
+  id: '/api/public/cron/publish',
+  path: '/api/public/cron/publish',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicWorkerClaimRoute = ApiPublicWorkerClaimRouteImport.update({
+  id: '/api/public/worker/claim',
+  path: '/api/public/worker/claim',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicWorkerUpdateRoute = ApiPublicWorkerUpdateRouteImport.update({
+  id: '/api/public/worker/update',
+  path: '/api/public/worker/update',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/public/cron/publish': typeof ApiPublicCronPublishRoute
+  '/api/public/worker/claim': typeof ApiPublicWorkerClaimRoute
+  '/api/public/worker/update': typeof ApiPublicWorkerUpdateRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/public/cron/publish': typeof ApiPublicCronPublishRoute
+  '/api/public/worker/claim': typeof ApiPublicWorkerClaimRoute
+  '/api/public/worker/update': typeof ApiPublicWorkerUpdateRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/public/cron/publish': typeof ApiPublicCronPublishRoute
+  '/api/public/worker/claim': typeof ApiPublicWorkerClaimRoute
+  '/api/public/worker/update': typeof ApiPublicWorkerUpdateRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/api/public/cron/publish'
+    | '/api/public/worker/claim'
+    | '/api/public/worker/update'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/api/public/cron/publish'
+    | '/api/public/worker/claim'
+    | '/api/public/worker/update'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/public/cron/publish'
+    | '/api/public/worker/claim'
+    | '/api/public/worker/update'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiPublicCronPublishRoute: typeof ApiPublicCronPublishRoute
+  ApiPublicWorkerClaimRoute: typeof ApiPublicWorkerClaimRoute
+  ApiPublicWorkerUpdateRoute: typeof ApiPublicWorkerUpdateRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +91,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/publish': {
+      id: '/api/public/cron/publish'
+      path: '/api/public/cron/publish'
+      fullPath: '/api/public/cron/publish'
+      preLoaderRoute: typeof ApiPublicCronPublishRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/worker/claim': {
+      id: '/api/public/worker/claim'
+      path: '/api/public/worker/claim'
+      fullPath: '/api/public/worker/claim'
+      preLoaderRoute: typeof ApiPublicWorkerClaimRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/worker/update': {
+      id: '/api/public/worker/update'
+      path: '/api/public/worker/update'
+      fullPath: '/api/public/worker/update'
+      preLoaderRoute: typeof ApiPublicWorkerUpdateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiPublicCronPublishRoute: ApiPublicCronPublishRoute,
+  ApiPublicWorkerClaimRoute: ApiPublicWorkerClaimRoute,
+  ApiPublicWorkerUpdateRoute: ApiPublicWorkerUpdateRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
