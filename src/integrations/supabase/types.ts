@@ -396,6 +396,7 @@ export type Database = {
       settings: {
         Row: {
           post_time: string
+          post_times: string[]
           publishing_active: boolean
           reel_time: string
           start_date: string | null
@@ -406,6 +407,7 @@ export type Database = {
         }
         Insert: {
           post_time?: string
+          post_times?: string[]
           publishing_active?: boolean
           reel_time?: string
           start_date?: string | null
@@ -416,6 +418,7 @@ export type Database = {
         }
         Update: {
           post_time?: string
+          post_times?: string[]
           publishing_active?: boolean
           reel_time?: string
           start_date?: string | null
