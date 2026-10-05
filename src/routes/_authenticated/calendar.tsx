@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { assetsQuery, publicationsQuery, settingsQuery, connectionQuery } from "@/lib/queries";
 import { addDays, formatOslo, osloDateKey } from "@/lib/schedule";
 import { planSchedule, lockedAssetIds } from "@/lib/plan";
-import { readiness } from "./library";
+import { readiness } from "@/lib/readiness";
 import { activatePublishing } from "@/lib/app.functions";
 
 export const Route = createFileRoute("/_authenticated/calendar")({

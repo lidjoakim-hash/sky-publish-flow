@@ -13,7 +13,7 @@ import { AudioBadge, Empty, PageHeader } from "@/components/app-ui";
 import { supabase } from "@/integrations/supabase/client";
 import { assetsQuery, signedUrl, type Asset } from "@/lib/queries";
 import { formatOslo } from "@/lib/schedule";
-import { reelAudioOk } from "@/lib/audio";
+import { readiness } from "@/lib/readiness";
 
 export const Route = createFileRoute("/_authenticated/library")({
   head: () => ({ meta: [{ title: "Library — Skyline Publisher" }, { name: "description", content: "Review media, captions and readiness." }, { property: "og:title", content: "Library — Skyline Publisher" }, { property: "og:description", content: "Review media, captions and readiness." }] }),
@@ -21,15 +21,6 @@ export const Route = createFileRoute("/_authenticated/library")({
 });
 
 type Filter = "all" | "reel" | "post" | "needs" | "skipped" | "seasonal";
-
-export function readiness(a: Asset): string[] {
-  const out: string[] = [];
-  if (a.upload_state !== "done") out.push("Not uploaded");
-  if (!a.caption?.trim()) out.push(a.caption_issue === "ambiguous" ? "Caption ambiguous" : "Caption missing");
-  if (a.kind === "reel" && !reelAudioOk(a.audio_state)) out.push("Needs audio");
-  if (a.seasonal) out.push("Seasonal: check date");
-  return out;
-}
 
 function LibraryPage() {
   const qc = useQueryClient();
