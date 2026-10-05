@@ -33,7 +33,7 @@ function CalendarPage() {
   const activate = useServerFn(activatePublishing);
   const tomorrow = addDays(osloDateKey(new Date()), 1);
   const [start, setStart] = useState(tomorrow);
-  const [postTime, setPostTime] = useState("18:00");
+  const [postTimes, setPostTimes] = useState<string[]>(["09:00", "13:00", "18:00"]);
   const [reelTime, setReelTime] = useState("19:00");
   const [mixing, setMixing] = useState(false);
   const [confirm, setConfirm] = useState(false);
@@ -42,7 +42,7 @@ function CalendarPage() {
   useEffect(() => {
     if (!settings) return;
     if (settings.start_date && settings.start_date > osloDateKey(new Date())) setStart(settings.start_date);
-    setPostTime(settings.post_time.slice(0, 5));
+    setPostTimes((settings.post_times?.length ? settings.post_times : [settings.post_time]).map((t) => t.slice(0, 5)));
     setReelTime(settings.reel_time.slice(0, 5));
     setMixing(settings.topic_mixing);
   }, [settings]);
@@ -61,13 +61,13 @@ function CalendarPage() {
 
   async function saveSettings() {
     if (!settings) return;
-    await supabase.from("settings").update({ start_date: start, post_time: postTime, reel_time: reelTime, topic_mixing: mixing, updated_at: new Date().toISOString() }).eq("user_id", settings.user_id);
+    await supabase.from("settings").update({ start_date: start, post_times: postTimes, post_time: postTimes[0] ?? "18:00", reel_time: reelTime, topic_mixing: mixing, updated_at: new Date().toISOString() }).eq("user_id", settings.user_id);
   }
 
   async function apply(mode: "append" | "reschedule" | "missed") {
     if (start <= osloDateKey(new Date()) && mode !== "missed") return toast.error("Choose a future start date.");
     await saveSettings();
-    const plan = planSchedule({ assets, pubs, startDate: mode === "missed" ? tomorrow : start, postTime, reelTime, timeZone: settings?.timezone ?? "Europe/Oslo", topicMixing: mixing, mode });
+    const plan = planSchedule({ assets, pubs, startDate: mode === "missed" ? tomorrow : start, postTimes, reelTime, timeZone: settings?.timezone ?? "Europe/Oslo", topicMixing: mixing, mode });
     if (!plan.size) return toast("Nothing to schedule.");
     const entries = [...plan];
     for (let i = 0; i < entries.length; i += 25) {
@@ -139,15 +139,24 @@ function CalendarPage() {
               <Label htmlFor="sd">Start date</Label>
               <Input id="sd" type="date" min={tomorrow} value={start} onChange={(e) => setStart(e.target.value)} className="h-11" />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="pt">Image post</Label>
-                <Input id="pt" type="time" value={postTime} onChange={(e) => setPostTime(e.target.value)} className="h-11" />
+            <div className="space-y-1.5">
+              <Label>Image posts (3 a day)</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {postTimes.map((t, i) => (
+                  <Input
+                    key={i}
+                    type="time"
+                    aria-label={`Image post ${i + 1}`}
+                    value={t}
+                    onChange={(e) => setPostTimes(postTimes.map((x, j) => (j === i ? e.target.value : x)))}
+                    className="h-11"
+                  />
+                ))}
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="rt">Reel</Label>
-                <Input id="rt" type="time" value={reelTime} onChange={(e) => setReelTime(e.target.value)} className="h-11" />
-              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="rt">Reel (1 a day)</Label>
+              <Input id="rt" type="time" value={reelTime} onChange={(e) => setReelTime(e.target.value)} className="h-11" />
             </div>
             <label className="flex items-center justify-between gap-2 text-sm">
               <span>Mix topics (from file names and your tags)</span>
