@@ -85,7 +85,7 @@ export const activatePublishing = createServerFn({ method: "POST" })
 /** Marks an "unknown" publication after the user checked the account manually. */
 export const resolvePublication = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: string; outcome: "published" | "retry" | "skip"; permalink?: string }) => d)
+  .validator((d: { id: string; outcome: "published" | "retry" | "skip"; permalink?: string }) => d)
   .handler(async ({ context, data }) => {
     const { data: pub } = await context.supabase.from("publications").select("id, status").eq("id", data.id).single();
     if (!pub) throw new Error("Not found");

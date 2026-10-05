@@ -280,7 +280,7 @@ export async function runImport(source: { kind: "files"; files: File[] } | { kin
     cb.onFile({ path, role, status: "uploading" });
     const up = await supabase.storage.from("media").upload(storagePath, blob, { contentType: mimeOf(path), upsert: false });
     if (up.error && !/exists/i.test(up.error.message)) throw up.error;
-    const patch: Record<string, unknown> = { storage_path: storagePath, upload_state: "done" };
+    const patch: { storage_path: string; upload_state: string; audio_state?: string; audio_rms_db?: number | null; duration_s?: number } = { storage_path: storagePath, upload_state: "done" };
     if (role === "reel") {
       try {
         const a = await probeAudioInBrowser(blob);

@@ -105,6 +105,15 @@ function AudioPage() {
     toast.success(`${n} Reels checked.`);
   }
 
+  async function workerProbe() {
+    const ids = reels.filter((r) => ["unchecked", "failed"].includes(r.audio_state) && r.storage_path).map((r) => r.id);
+    if (!ids.length) return toast("No unchecked Reels.");
+    const { error } = await supabase.from("render_jobs").insert(ids.map((asset_id) => ({ asset_id, mode: "probe" as const })));
+    if (error) return toast.error(error.message);
+    toast.success(`${ids.length} Reels queued for an exact check by your render worker.`);
+    qc.invalidateQueries();
+  }
+
   async function cancel(id: string) {
     await supabase.from("render_jobs").update({ cancel_requested: true }).eq("id", id);
     await supabase.from("render_jobs").update({ status: "cancelled" }).eq("id", id).eq("status", "queued");
@@ -120,7 +129,7 @@ function AudioPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <PageHeader title="Audio Studio" subtitle="Every Reel needs audible audio before it can be approved. Originals are never changed." actions={<Button variant="outline" onClick={recheck} disabled={checking}><RefreshCw /> {checking ? "Checking…" : "Re-check audio"}</Button>} />
+      <PageHeader title="Audio Studio" subtitle="Every Reel needs audible audio before it can be approved. Originals are never changed." actions={<><Button variant="outline" onClick={recheck} disabled={checking}><RefreshCw /> {checking ? "Checking…" : "Re-check in browser"}</Button>{counts.other > 0 && <Button variant="outline" onClick={workerProbe}>Exact check with worker</Button>}</>} />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Ready" value={counts.ready} tone="teal" />
         <Stat label="Silent audio" value={counts.silent} tone="warn" />
