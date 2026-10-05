@@ -3,7 +3,7 @@ import { parseCaptionCsv } from "@/lib/csv";
 import { classifyFiles, matchCaption, importOrder } from "@/lib/matching";
 import { assignSchedule, zonedToUtc } from "@/lib/schedule";
 import { validateEntryPath, checkBomb } from "@/lib/zip-safety";
-import { classifyLevel } from "@/lib/audio";
+import { classifyLevel, mp4HasSoundTrack } from "@/lib/audio";
 
 describe("CSV captions", () => {
   it("parses quoted, multiline Norwegian captions with escaped quotes", () => {
@@ -110,5 +110,10 @@ describe("audio levels", () => {
     expect(classifyLevel(false, null)).toBe("missing");
     expect(classifyLevel(true, -90)).toBe("silent");
     expect(classifyLevel(true, -22)).toBe("existing");
+  });
+  it("detects whether an MP4 has a sound track", () => {
+    const hdlr = (t: string) => new Uint8Array([...Buffer.from("hdlr"), 0, 0, 0, 0, 0, 0, 0, 0, ...Buffer.from(t), 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(mp4HasSoundTrack(hdlr("vide"))).toBe(false);
+    expect(mp4HasSoundTrack(new Uint8Array([...hdlr("vide"), ...hdlr("soun")]))).toBe(true);
   });
 });
