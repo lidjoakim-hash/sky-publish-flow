@@ -59,7 +59,8 @@ export interface SchedulableItem {
 
 export interface ScheduleOptions {
   startDate: string;
-  postTime: string;
+  /** Daily image-post slots, in order (e.g. ["09:00", "13:00", "18:00"] = three posts a day). */
+  postTimes: string[];
   reelTime: string;
   timeZone?: string;
   /** UTC ISO strings already occupied (published, partially published, or scheduled items not being moved). */
@@ -84,22 +85,24 @@ export function mixTopics<T extends SchedulableItem>(items: T[]): T[] {
 }
 
 /**
- * Assigns one daily slot per type. Posts and Reels are scheduled independently, so 44 posts end
- * after 44 days and 120 Reels after 120 days. Occupied and past slots are skipped (no collisions,
- * no bursts of backlog).
+ * Assigns daily slots per type. Posts fill each of the daily post times in order (e.g. three posts
+ * a day), Reels get one daily slot; the two types are scheduled independently. Occupied and past
+ * slots are skipped (no collisions, no bursts of backlog).
  */
 export function assignSchedule<T extends SchedulableItem>(items: T[], opts: ScheduleOptions): Map<string, string> {
   const tz = opts.timeZone ?? "Europe/Oslo";
+  const postTimes = opts.postTimes.length ? opts.postTimes : ["18:00"];
   const result = new Map<string, string>();
   for (const kind of ["post", "reel"] as const) {
     let list = items.filter((i) => i.kind === kind);
     if (opts.topicMixing) list = mixTopics(list);
-    const time = kind === "post" ? opts.postTime : opts.reelTime;
-    let day = 0;
+    let k = 0;
     for (const item of list) {
       for (;;) {
+        const day = kind === "post" ? Math.floor(k / postTimes.length) : k;
+        const time = kind === "post" ? postTimes[k % postTimes.length]! : opts.reelTime;
         const slot = zonedToUtc(addDays(opts.startDate, day), time, tz);
-        day++;
+        k++;
         const iso = slot.toISOString();
         if (slot <= opts.notBefore || opts.taken.has(iso)) continue;
         result.set(item.id, iso);
