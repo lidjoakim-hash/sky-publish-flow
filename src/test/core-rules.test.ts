@@ -72,19 +72,24 @@ describe("Oslo scheduling", () => {
     expect(zonedToUtc("2026-10-25", "19:00").toISOString()).toBe("2026-10-25T18:00:00.000Z");
     expect(zonedToUtc("2027-03-28", "18:00").toISOString()).toBe("2027-03-28T16:00:00.000Z");
   });
-  it("posts finish after 44 days and Reels after 120, independently", () => {
+  it("schedules three posts a day across the three post times, Reels one a day", () => {
     const items = [
-      ...Array.from({ length: 44 }, (_, i) => ({ id: `p${i}`, kind: "post" as const })),
+      ...Array.from({ length: 45 }, (_, i) => ({ id: `p${i}`, kind: "post" as const })),
       ...Array.from({ length: 120 }, (_, i) => ({ id: `r${i}`, kind: "reel" as const })),
     ];
-    const m = assignSchedule(items, { startDate: "2026-11-01", postTime: "18:00", reelTime: "19:00", taken: new Set(), notBefore: new Date("2026-10-01") });
-    expect(m.get("p43")).toBe(zonedToUtc("2026-12-14", "18:00").toISOString());
+    const m = assignSchedule(items, { startDate: "2026-11-01", postTimes: ["09:00", "13:00", "18:00"], reelTime: "19:00", taken: new Set(), notBefore: new Date("2026-10-01") });
+    // Day 1 fills 09:00, 13:00, 18:00 in order; post 45 lands on day 15 at 09:00.
+    expect(m.get("p0")).toBe(zonedToUtc("2026-11-01", "09:00").toISOString());
+    expect(m.get("p1")).toBe(zonedToUtc("2026-11-01", "13:00").toISOString());
+    expect(m.get("p2")).toBe(zonedToUtc("2026-11-01", "18:00").toISOString());
+    expect(m.get("p3")).toBe(zonedToUtc("2026-11-02", "09:00").toISOString());
+    expect(m.get("p44")).toBe(zonedToUtc("2026-11-15", "18:00").toISOString());
     expect(m.get("r119")).toBe(zonedToUtc("2027-02-28", "19:00").toISOString());
   });
   it("skips occupied and past slots when appending", () => {
     const taken = new Set([zonedToUtc("2026-11-02", "19:00").toISOString()]);
     const m = assignSchedule([{ id: "a", kind: "reel" }, { id: "b", kind: "reel" }], {
-      startDate: "2026-11-01", postTime: "18:00", reelTime: "19:00", taken, notBefore: zonedToUtc("2026-11-01", "20:00"),
+      startDate: "2026-11-01", postTimes: ["18:00"], reelTime: "19:00", taken, notBefore: zonedToUtc("2026-11-01", "20:00"),
     });
     expect(m.get("a")).toBe(zonedToUtc("2026-11-03", "19:00").toISOString());
     expect(m.get("b")).toBe(zonedToUtc("2026-11-04", "19:00").toISOString());
