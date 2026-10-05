@@ -1,0 +1,93 @@
+import { queryOptions } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+
+export type Asset = Database["public"]["Tables"]["assets"]["Row"];
+export type Publication = Database["public"]["Tables"]["publications"]["Row"];
+export type Settings = Database["public"]["Tables"]["settings"]["Row"];
+export type Batch = Database["public"]["Tables"]["batches"]["Row"];
+export type Track = Database["public"]["Tables"]["audio_tracks"]["Row"];
+export type RenderJob = Database["public"]["Tables"]["render_jobs"]["Row"];
+
+async function all<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await build(from, from + 999);
+    if (error) throw error;
+    out.push(...(data ?? []));
+    if (!data || data.length < 1000) return out;
+  }
+}
+
+export const assetsQuery = queryOptions({
+  queryKey: ["assets"],
+  queryFn: () => all<Asset>((f, t) => supabase.from("assets").select("*").order("sort_index").range(f, t)),
+});
+
+export const publicationsQuery = queryOptions({
+  queryKey: ["publications"],
+  queryFn: () => all<Publication>((f, t) => supabase.from("publications").select("*").range(f, t)),
+});
+
+export const settingsQuery = queryOptions({
+  queryKey: ["settings"],
+  queryFn: async (): Promise<Settings> => {
+    const { data, error } = await supabase.from("settings").select("*").maybeSingle();
+    if (error) throw error;
+    if (data) return data;
+    const { data: created, error: e2 } = await supabase.from("settings").insert({}).select().single();
+    if (e2) throw e2;
+    return created;
+  },
+});
+
+export const batchesQuery = queryOptions({
+  queryKey: ["batches"],
+  queryFn: async () => {
+    const { data, error } = await supabase.from("batches").select("*").order("created_at", { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+});
+
+export const connectionQuery = queryOptions({
+  queryKey: ["connection"],
+  queryFn: async () => {
+    const { data, error } = await supabase.from("meta_connection").select("*").maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+});
+
+export const tracksQuery = queryOptions({
+  queryKey: ["tracks"],
+  queryFn: async () => {
+    const { data, error } = await supabase.from("audio_tracks").select("*").order("created_at");
+    if (error) throw error;
+    return data;
+  },
+});
+
+export const jobsQuery = queryOptions({
+  queryKey: ["render_jobs"],
+  queryFn: async () => {
+    const { data, error } = await supabase.from("render_jobs").select("*").order("created_at", { ascending: false }).limit(300);
+    if (error) throw error;
+    return data;
+  },
+  refetchInterval: 5000,
+});
+
+export const alertsQuery = queryOptions({
+  queryKey: ["alerts"],
+  queryFn: async () => {
+    const { data, error } = await supabase.from("alerts").select("*").eq("read", false).order("created_at", { ascending: false }).limit(20);
+    if (error) throw error;
+    return data;
+  },
+});
+
+export async function signedUrl(path: string, seconds = 600) {
+  const { data } = await supabase.storage.from("media").createSignedUrl(path, seconds);
+  return data?.signedUrl ?? null;
+}

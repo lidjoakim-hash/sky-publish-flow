@@ -1,0 +1,182 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import { Download, Eye, EyeOff, Film, Image as ImageIcon, Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AudioBadge, Empty, PageHeader } from "@/components/app-ui";
+import { supabase } from "@/integrations/supabase/client";
+import { assetsQuery, signedUrl, type Asset } from "@/lib/queries";
+import { formatOslo } from "@/lib/schedule";
+import { reelAudioOk } from "@/lib/audio";
+
+export const Route = createFileRoute("/_authenticated/library")({
+  head: () => ({ meta: [{ title: "Library — Skyline Publisher" }, { name: "description", content: "Review media, captions and readiness." }, { property: "og:title", content: "Library — Skyline Publisher" }, { property: "og:description", content: "Review media, captions and readiness." }] }),
+  component: LibraryPage,
+});
+
+type Filter = "all" | "reel" | "post" | "needs" | "skipped" | "seasonal";
+
+export function readiness(a: Asset): string[] {
+  const out: string[] = [];
+  if (a.upload_state !== "done") out.push("Not uploaded");
+  if (!a.caption?.trim()) out.push(a.caption_issue === "ambiguous" ? "Caption ambiguous" : "Caption missing");
+  if (a.kind === "reel" && !reelAudioOk(a.audio_state)) out.push("Needs audio");
+  if (a.seasonal) out.push("Seasonal: check date");
+  return out;
+}
+
+function LibraryPage() {
+  const qc = useQueryClient();
+  const { data: assets = [] } = useQuery(assetsQuery);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [q, setQ] = useState("");
+  const [edit, setEdit] = useState<Asset | null>(null);
+  const [preview, setPreview] = useState<{ a: Asset; url: string } | null>(null);
+
+  const list = useMemo(
+    () =>
+      assets.filter((a) => {
+        if (q && !`${a.rel_path} ${a.caption ?? ""} ${a.topics.join(" ")}`.toLowerCase().includes(q.toLowerCase())) return false;
+        if (filter === "reel" || filter === "post") return a.kind === filter && !a.skipped;
+        if (filter === "skipped") return a.skipped;
+        if (filter === "seasonal") return a.seasonal;
+        if (filter === "needs") return !a.skipped && readiness(a).some((r) => !r.startsWith("Seasonal"));
+        return true;
+      }),
+    [assets, filter, q],
+  );
+
+  async function patch(id: string, p: Partial<Asset>) {
+    const { error } = await supabase.from("assets").update(p).eq("id", id);
+    if (error) toast.error(error.message);
+    qc.invalidateQueries({ queryKey: ["assets"] });
+  }
+
+  async function open(a: Asset) {
+    const path = a.kind === "reel" ? (a.rendered_path ?? a.storage_path) : a.storage_path;
+    if (!path) return toast("Not uploaded yet");
+    const url = await signedUrl(path);
+    if (url) setPreview({ a, url });
+  }
+
+  function exportDraft() {
+    const esc = (s: string) => `"${s.replace(/"/g, '""')}"`;
+    const rows = [["Asset", "Type", "Caption", "Topics", "Scheduled (Oslo)", "Skipped", "Audio"].join(",")];
+    for (const a of assets)
+      rows.push([esc(a.rel_path), a.kind === "reel" ? "Reel" : "Post", esc(a.caption ?? ""), esc(a.topics.join(" ")), a.scheduled_at ? esc(formatOslo(a.scheduled_at)) : "", a.skipped ? "yes" : "", a.audio_state].join(","));
+    const blob = new Blob(["\uFEFF" + rows.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "skyline-draft.csv";
+    link.click();
+  }
+
+  const counts = {
+    reel: assets.filter((a) => a.kind === "reel" && !a.skipped).length,
+    post: assets.filter((a) => a.kind === "post" && !a.skipped).length,
+    needs: assets.filter((a) => !a.skipped && readiness(a).some((r) => !r.startsWith("Seasonal"))).length,
+  };
+
+  return (
+    <div className="mx-auto max-w-6xl">
+      <PageHeader
+        title="Library"
+        subtitle={`Step 2 of 4 · ${counts.reel} Reels · ${counts.post} posts · ${counts.needs} need attention`}
+        actions={<Button variant="outline" onClick={exportDraft} disabled={!assets.length}><Download /> Export draft</Button>}
+      />
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row">
+        <Input placeholder="Search file, caption or topic" value={q} onChange={(e) => setQ(e.target.value)} className="h-11 sm:max-w-xs" />
+        <Select value={filter} onValueChange={(v) => setFilter(v as Filter)}>
+          <SelectTrigger className="h-11 sm:w-56"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Everything</SelectItem>
+            <SelectItem value="reel">Reels</SelectItem>
+            <SelectItem value="post">Image posts</SelectItem>
+            <SelectItem value="needs">Needs attention</SelectItem>
+            <SelectItem value="seasonal">Seasonal topics</SelectItem>
+            <SelectItem value="skipped">Skipped</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {assets.length === 0 ? (
+        <Empty>No media yet. Start with “Add batch”. Nothing from your 164 files has been uploaded so far.</Empty>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {list.map((a) => {
+            const issues = readiness(a);
+            return (
+              <article key={a.id} className={`flex flex-col rounded-xl border bg-card p-4 shadow-card ${a.skipped ? "opacity-60" : ""}`}>
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    {a.kind === "reel" ? <Film className="size-4 shrink-0 text-teal" /> : <ImageIcon className="size-4 shrink-0 text-teal" />}
+                    <span className="truncate text-sm font-semibold" title={a.rel_path}>{a.file_name}</span>
+                  </div>
+                  {a.kind === "reel" && <AudioBadge state={a.audio_state} />}
+                </div>
+                <p className="line-clamp-3 min-h-[3.75rem] whitespace-pre-line text-sm text-muted-foreground">{a.caption ?? "—"}</p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {a.campaign_first && <Badge variant="teal">Campaign</Badge>}
+                  {a.topics.slice(0, 3).map((t) => <Badge key={t} variant="muted">{t}</Badge>)}
+                  {issues.map((i) => <Badge key={i} variant="warning">{i}</Badge>)}
+                  {a.approved && <Badge variant="success">Approved</Badge>}
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">{a.scheduled_at ? formatOslo(a.scheduled_at) : "No date yet"}</div>
+                <div className="mt-3 flex gap-2 border-t pt-3">
+                  <Button size="sm" variant="ghost" onClick={() => open(a)}><Eye /> Preview</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEdit(a)}><Pencil /> Edit</Button>
+                  <Button size="sm" variant="ghost" className="ml-auto" onClick={() => patch(a.id, { skipped: !a.skipped, approved: false })}>
+                    <EyeOff /> {a.skipped ? "Unskip" : "Skip"}
+                  </Button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      <EditDialog asset={edit} onClose={() => setEdit(null)} onSave={async (p) => { if (edit) await patch(edit.id, p); setEdit(null); }} />
+      <Dialog open={!!preview} onOpenChange={(o) => !o && setPreview(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{preview?.a.file_name}</DialogTitle></DialogHeader>
+          {preview && (preview.a.kind === "reel" ? <video src={preview.url} controls className="max-h-[60vh] w-full rounded-lg bg-primary" /> : <img src={preview.url} alt={preview.a.file_name} className="max-h-[60vh] w-full rounded-lg object-contain" />)}
+          <p className="max-h-40 overflow-auto whitespace-pre-line text-sm">{preview?.a.caption}</p>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function EditDialog({ asset, onClose, onSave }: { asset: Asset | null; onClose: () => void; onSave: (p: Partial<Asset>) => Promise<void> }) {
+  const [caption, setCaption] = useState("");
+  const [topics, setTopics] = useState("");
+  const [lastId, setLastId] = useState<string | null>(null);
+  if (asset && asset.id !== lastId) {
+    setLastId(asset.id);
+    setCaption(asset.caption ?? "");
+    setTopics(asset.topics.join(", "));
+  }
+  return (
+    <Dialog open={!!asset} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>Edit {asset?.file_name}</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <Textarea rows={8} value={caption} onChange={(e) => setCaption(e.target.value)} />
+          <Input value={topics} onChange={(e) => setTopics(e.target.value)} placeholder="Topics, comma separated" />
+          <p className="text-xs text-muted-foreground">Source: {asset?.caption_source ?? "none"}. Captions are never rewritten automatically.</p>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="teal" onClick={() => onSave({ caption, caption_issue: caption.trim() ? null : "missing", caption_source: caption !== (asset?.caption ?? "") ? "edited" : asset?.caption_source, topics: topics.split(",").map((t) => t.trim()).filter(Boolean), approved: false })}>
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
