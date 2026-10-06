@@ -36,6 +36,13 @@
       "when": 1791264622033,
       "tag": "0004_commit_schedule_rpc",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791264645990,
+      "tag": "0005_commit_schedule_definer",
+      "breakpoints": true
     }
   ]
 }
