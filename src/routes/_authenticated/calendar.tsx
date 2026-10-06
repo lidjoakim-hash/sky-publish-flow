@@ -15,7 +15,12 @@ import { Empty, PageHeader, Panel, PubBadge } from "@/components/app-ui";
 import { supabase } from "@/integrations/supabase/client";
 import { assetsQuery, publicationsQuery, settingsQuery, connectionQuery } from "@/lib/queries";
 import { addDays, formatOslo, osloDateKey } from "@/lib/schedule";
-import { planSchedule, lockedAssetIds } from "@/lib/plan";
+import { planWithStrategy, lockedAssetIds } from "@/lib/plan";
+import type { StrategyPlanResult } from "@/lib/planner";
+import { bucketLabel } from "@/lib/strategy";
+import { commitSchedule } from "@/lib/strategy.functions";
+import { BrandSwitcher, useActiveBrand } from "@/components/brand";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { readiness } from "@/lib/readiness";
 import { activatePublishing } from "@/lib/app.functions";
 
@@ -31,6 +36,9 @@ function CalendarPage() {
   const { data: settings } = useQuery(settingsQuery);
   const { data: conn } = useQuery(connectionQuery);
   const activate = useServerFn(activatePublishing);
+  const commit = useServerFn(commitSchedule);
+  const { slug, strategy } = useActiveBrand();
+  const [preview, setPreview] = useState<(StrategyPlanResult & { mode: string }) | null>(null);
   const tomorrow = addDays(osloDateKey(new Date()), 1);
   const [start, setStart] = useState(tomorrow);
   const [postTimes, setPostTimes] = useState<string[]>(["09:00", "13:00", "18:00"]);
@@ -47,7 +55,7 @@ function CalendarPage() {
     setMixing(settings.topic_mixing);
   }, [settings]);
 
-  const scheduled = useMemo(() => assets.filter((a) => a.scheduled_at && !a.skipped).sort((a, b) => a.scheduled_at!.localeCompare(b.scheduled_at!)), [assets]);
+  const scheduled = useMemo(() => assets.filter((a) => a.scheduled_at && !a.skipped && a.brand_slug === slug).sort((a, b) => a.scheduled_at!.localeCompare(b.scheduled_at!)), [assets]);
   const pubBy = useMemo(() => {
     const m = new Map<string, Record<string, string>>();
     for (const p of pubs) m.set(p.asset_id, { ...(m.get(p.asset_id) ?? {}), [p.platform]: p.status });
@@ -67,13 +75,16 @@ function CalendarPage() {
   async function apply(mode: "append" | "reschedule" | "missed") {
     if (start <= osloDateKey(new Date()) && mode !== "missed") return toast.error("Choose a future start date.");
     await saveSettings();
-    const plan = planSchedule({ assets, pubs, startDate: mode === "missed" ? tomorrow : start, postTimes, reelTime, timeZone: settings?.timezone ?? "Europe/Oslo", topicMixing: mixing, mode });
-    if (!plan.size) return toast("Nothing to schedule.");
-    const entries = [...plan];
-    for (let i = 0; i < entries.length; i += 25) {
-      await Promise.all(entries.slice(i, i + 25).map(([id, at]) => supabase.from("assets").update({ scheduled_at: at, approved: false }).eq("id", id)));
-    }
-    toast.success(`${plan.size} items dated. Review them, then approve.`);
+    const res = planWithStrategy({ assets, pubs, startDate: mode === "missed" ? tomorrow : start, postTimes, reelTime, timeZone: settings?.timezone ?? "Europe/Oslo", topicMixing: mixing, mode, brand: slug, strategy });
+    if (!res.assignments.size && !res.held.length) return toast("Nothing to schedule.");
+    setPreview({ ...res, mode });
+  }
+
+  async function commitPreview() {
+    if (!preview) return;
+    const r = await commit({ data: { brand: slug, assignments: [...preview.assignments].map(([id, at]) => ({ id, at })) } });
+    setPreview(null);
+    toast.success(`${r.saved} items dated. Review them, then approve.${r.rejected.length ? ` ${r.rejected.length} refused by the server.` : ""}`);
     qc.invalidateQueries({ queryKey: ["assets"] });
   }
 
@@ -124,13 +135,14 @@ function CalendarPage() {
       <PageHeader
         title="Calendar"
         subtitle="Step 3–4 · Assign dates, review once, then activate. Times are Oslo time and follow summer/winter time."
-        actions={
-          settings?.publishing_active ? (
+        actions={<>
+          <BrandSwitcher />
+          {settings?.publishing_active ? (
             <Button variant="outline" onClick={pause}><PauseCircle /> Pause publishing</Button>
           ) : (
-            <Button variant="hero" onClick={() => setConfirm(true)} disabled={!scheduled.length}><PlayCircle /> Activate</Button>
-          )
-        }
+            <Button variant="hero" onClick={() => setConfirm(true)} disabled={!scheduled.length || slug !== "skyline"}><PlayCircle /> Activate</Button>
+          )}
+        </>}
       />
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel title="Plan" className="lg:col-span-1">
@@ -231,6 +243,7 @@ function CalendarPage() {
         </TabsContent>
       </Tabs>
 
+      <PlanPreview preview={preview} assets={assets} onCancel={() => setPreview(null)} onCommit={commitPreview} />
       <AlertDialog open={confirm} onOpenChange={setConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -248,5 +261,41 @@ function CalendarPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function PlanPreview({ preview, assets, onCancel, onCommit }: { preview: (StrategyPlanResult & { mode: string }) | null; assets: { id: string; file_name: string; bucket: string | null; kind: string }[]; onCancel: () => void; onCommit: () => void }) {
+  const byId = new Map(assets.map((a) => [a.id, a]));
+  const rows = preview ? [...preview.assignments].sort((a, b) => a[1].localeCompare(b[1])) : [];
+  const mix = new Map<string, number>();
+  for (const [id] of rows) { const b = bucketLabel(byId.get(id)?.bucket); mix.set(b, (mix.get(b) ?? 0) + 1); }
+  return (
+    <Dialog open={!!preview} onOpenChange={(o) => !o && onCancel()}>
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Preview plan</DialogTitle>
+          <DialogDescription>{rows.length} items get dates. Nothing is saved until you confirm. Published, partly published and locked items keep their dates.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          <div className="flex flex-wrap gap-1">{[...mix].map(([b, n]) => <Badge key={b} variant="secondary">{b}: {n}</Badge>)}</div>
+          {preview && preview.held.length > 0 && (
+            <div><div className="font-medium">Held back ({preview.held.length})</div>
+              <ul className="list-disc pl-5 text-xs">{preview.held.slice(0, 20).map((h) => <li key={h.id}>{byId.get(h.id)?.file_name}: {h.reason}</li>)}</ul></div>
+          )}
+          {preview && preview.shortages.length > 0 && (
+            <div><div className="font-medium">Empty slots ({preview.shortages.length})</div>
+              <p className="text-xs text-muted-foreground">Left empty instead of repeating a source or hook. Add more varied media or lower the cooldown in Strategy.</p>
+              <ul className="list-disc pl-5 text-xs">{preview.shortages.slice(0, 10).map((s) => <li key={s.at + s.kind}>{formatOslo(s.at)} {s.kind}: {s.reason}</li>)}</ul></div>
+          )}
+          <div className="max-h-60 divide-y overflow-y-auto rounded border">
+            {rows.slice(0, 200).map(([id, at]) => <div key={id} className="flex gap-3 px-2 py-1 text-xs"><span className="w-36 shrink-0">{formatOslo(at)}</span><span className="truncate">{byId.get(id)?.file_name}</span><span className="ml-auto text-muted-foreground">{bucketLabel(byId.get(id)?.bucket)}</span></div>)}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel}>Cancel</Button>
+          <Button variant="teal" onClick={onCommit} disabled={!rows.length}>Save {rows.length} dates</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

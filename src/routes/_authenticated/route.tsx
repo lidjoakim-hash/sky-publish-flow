@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, Gauge, Library, Music2, Send, Plug, Upload, LogOut, PauseCircle, PlayCircle } from "lucide-react";
+import { CalendarDays, Gauge, Library, Music2, Send, Plug, Upload, LogOut, PauseCircle, PlayCircle, Compass, Tags, Lightbulb, BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { settingsQuery } from "@/lib/queries";
 import { cn } from "@/lib/utils";
@@ -19,9 +19,13 @@ const NAV = [
   { to: "/overview", label: "Overview", icon: Gauge },
   { to: "/import", label: "Add batch", icon: Upload },
   { to: "/library", label: "Library", icon: Library },
+  { to: "/organize", label: "Organize", icon: Tags },
+  { to: "/strategy", label: "Strategy", icon: Compass },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
+  { to: "/ideas", label: "Ideas", icon: Lightbulb },
   { to: "/audio", label: "Audio Studio", icon: Music2 },
   { to: "/results", label: "Results", icon: Send },
+  { to: "/performance", label: "Performance", icon: BarChart3 },
   { to: "/connections", label: "Connections", icon: Plug },
 ] as const;
 
@@ -59,9 +63,9 @@ function Shell() {
       <main className="min-w-0 flex-1 px-4 pb-28 pt-6 sm:px-6 lg:px-10 lg:pb-10">
         <Outlet />
       </main>
-      <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-7 border-t bg-card lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-20 flex overflow-x-auto border-t bg-card lg:hidden">
         {NAV.map((n) => (
-          <Link key={n.to} to={n.to} className={cn("flex flex-col items-center gap-1 py-2.5 text-[10px] text-muted-foreground", path.startsWith(n.to) && "text-teal")}>
+          <Link key={n.to} to={n.to} className={cn("flex min-w-16 flex-1 flex-col items-center gap-1 py-2.5 text-[10px] text-muted-foreground", path.startsWith(n.to) && "text-teal")}>
             <n.icon className="size-5" />
             <span className="truncate">{n.label.split(" ")[0]}</span>
           </Link>

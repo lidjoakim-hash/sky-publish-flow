@@ -64,6 +64,7 @@ export const activatePublishing = createServerFn({ method: "POST" })
       .from("assets")
       .select("id, kind, audio_state, caption, approved, skipped, scheduled_at, upload_state")
       .eq("skipped", false)
+      .eq("brand_slug", "skyline") // Meta secrets belong to Skyline; other brands are never sent with them.
       .not("scheduled_at", "is", null);
     if (error) throw error;
     const blockers = (assets ?? []).filter(
