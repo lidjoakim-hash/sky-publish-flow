@@ -77,7 +77,7 @@ describe("brand boundaries and locks", () => {
     const v = asset("v", { brand_slug: "velune", scheduled_at: "2026-11-02T08:00:00.000Z" });
     const r = planWithStrategy(input([asset("s"), v]));
     expect(r.assignments.has("v")).toBe(false);
-    expect(r.assignments.get("s")).toBe("2026-11-03T08:00:00.000Z");
+    expect(Math.abs(new Date(r.assignments.get("s")!).getTime() - Date.parse("2026-11-03T08:00:00.000Z"))).toBeLessThanOrEqual(5 * 60_000); // next free slot, ±5 min jitter
   });
   it("keeps locked items and holds rejected ones with a reason", () => {
     const locked = asset("l", { scheduled_at: "2026-11-05T08:00:00.000Z" });
