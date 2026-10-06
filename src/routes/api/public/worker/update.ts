@@ -1,3 +1,4 @@
+import { loudnessOk, MIN_RENDER_LUFS } from "@/lib/publishing-rules";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { workerDenied } from "@/lib/worker-auth.server";
@@ -60,6 +61,7 @@ export const Route = createFileRoute("/api/public/worker/update")({
         }
         const problems: string[] = [];
         if (level !== "existing") problems.push(`audio ${level}`);
+        if (!loudnessOk(v.loudness_lufs)) problems.push(`too quiet (${v.loudness_lufs} LUFS, need at least ${MIN_RENDER_LUFS})`);
         if (v.audio_codec !== "aac") problems.push("audio is not AAC");
         if (v.video_codec !== "h264") problems.push("video is not H.264");
         if (v.duration_s < 3 || v.duration_s > 900) problems.push("duration outside Reels range");
