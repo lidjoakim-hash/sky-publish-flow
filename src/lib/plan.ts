@@ -1,5 +1,7 @@
 import type { Asset, Publication } from "./queries";
 import { assignSchedule } from "./schedule";
+import { strategyPlan, type HistoryEntry, type StrategyPlanResult } from "./planner";
+import { sourceGroupOf, type BrandStrategy } from "./strategy";
 
 /** An item is locked once any platform has gone past "waiting": its slot and records are preserved. */
 export function lockedAssetIds(pubs: Publication[]): Set<string> {
@@ -38,8 +40,6 @@ export function planSchedule(i: PlanInput): Map<string, string> {
   );
 }
 
-import { strategyPlan, type HistoryEntry, type StrategyPlanResult } from "./planner";
-import { sourceGroupOf, type BrandStrategy } from "./strategy";
 
 export interface StrategyPlanInput extends PlanInput {
   brand: string;
