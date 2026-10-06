@@ -44,6 +44,7 @@ export type Database = {
       assets: {
         Row: {
           approved: boolean
+          audio_mode: string | null
           audio_rms_db: number | null
           audio_state: string
           batch_id: string | null
@@ -58,6 +59,7 @@ export type Database = {
           created_at: string
           duration_s: number | null
           file_name: string
+          finish_in_instagram: boolean
           height: number | null
           hooks: string[]
           id: string
@@ -84,6 +86,7 @@ export type Database = {
         }
         Insert: {
           approved?: boolean
+          audio_mode?: string | null
           audio_rms_db?: number | null
           audio_state?: string
           batch_id?: string | null
@@ -98,6 +101,7 @@ export type Database = {
           created_at?: string
           duration_s?: number | null
           file_name: string
+          finish_in_instagram?: boolean
           height?: number | null
           hooks?: string[]
           id?: string
@@ -124,6 +128,7 @@ export type Database = {
         }
         Update: {
           approved?: boolean
+          audio_mode?: string | null
           audio_rms_db?: number | null
           audio_state?: string
           batch_id?: string | null
@@ -138,6 +143,7 @@ export type Database = {
           created_at?: string
           duration_s?: number | null
           file_name?: string
+          finish_in_instagram?: boolean
           height?: number | null
           hooks?: string[]
           id?: string
@@ -599,6 +605,7 @@ export type Database = {
           post_time: string
           post_times: string[]
           publishing_active: boolean
+          reel_audio_mode: string
           reel_time: string
           start_date: string | null
           timezone: string
@@ -611,6 +618,7 @@ export type Database = {
           post_time?: string
           post_times?: string[]
           publishing_active?: boolean
+          reel_audio_mode?: string
           reel_time?: string
           start_date?: string | null
           timezone?: string
@@ -623,6 +631,7 @@ export type Database = {
           post_time?: string
           post_times?: string[]
           publishing_active?: boolean
+          reel_audio_mode?: string
           reel_time?: string
           start_date?: string | null
           timezone?: string

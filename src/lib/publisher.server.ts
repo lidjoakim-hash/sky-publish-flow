@@ -6,6 +6,7 @@
  */
 import { graph, MetaError, readMetaCreds, ruploadFromUrl, type MetaCreds } from "./meta.server";
 import { missedAlertMessage } from "./publishing-rules";
+import { FINISH_MESSAGE, effectiveAudioMode, needsInstagramFinish, publishFile } from "./reel-audio";
 
 type Admin = Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"];
 interface Pub {
@@ -76,7 +77,11 @@ async function alert(admin: Admin, userId: string, level: string, message: strin
 async function mediaUrls(admin: Admin, assetId: string) {
   const { data: a, error } = await admin.from("assets").select("*").eq("id", assetId).single();
   if (error || !a) throw new MetaError("Asset missing", "permanent");
-  const path = a.kind === "reel" ? (a.rendered_path ?? a.storage_path) : a.storage_path;
+  let path = a.storage_path;
+  if (a.kind === "reel") {
+    const { data: s } = await admin.from("settings").select("reel_audio_mode").eq("user_id", a.user_id).maybeSingle();
+    path = publishFile(a, effectiveAudioMode(a.audio_mode, s?.reel_audio_mode));
+  }
   if (!path) throw new MetaError("Media not uploaded", "permanent");
   const sign = async (p: string) => {
     const { data, error: e } = await admin.storage.from("media").createSignedUrl(p, SIGNED_URL_TTL);
@@ -93,6 +98,13 @@ async function step(admin: Admin, c: MetaCreds, pub: Pub) {
 
 async function stepInstagram(admin: Admin, c: MetaCreds, pub: Pub) {
   if (pub.status === "pending" || pub.status === "retry") {
+    // Trending sounds can't be added via the API: hand the Reel to the owner, nothing is sent.
+    const { data: chk } = await admin.from("assets").select("kind, finish_in_instagram, file_name").eq("id", pub.asset_id).single();
+    if (chk && needsInstagramFinish(chk, "instagram")) {
+      await set(admin, pub.id, { status: "needs_finish", last_error: FINISH_MESSAGE, lease_owner: null, lease_until: null });
+      await alert(admin, pub.user_id, "info", `Finish in Instagram now: ${chk.file_name}`);
+      return;
+    }
     const { asset, url, coverUrl } = await mediaUrls(admin, pub.asset_id);
     await set(admin, pub.id, { status: "sending", intent_at: new Date().toISOString(), attempts: pub.attempts + 1 });
     const params =

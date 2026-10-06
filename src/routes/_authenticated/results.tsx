@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Empty, PageHeader, PubBadge } from "@/components/app-ui";
-import { assetsQuery, publicationsQuery, type Publication } from "@/lib/queries";
+import { assetsQuery, publicationsQuery, signedUrl, type Publication } from "@/lib/queries";
 import { formatOslo } from "@/lib/schedule";
 import { resolvePublication } from "@/lib/app.functions";
 import { MissedPanel } from "@/components/missed";
@@ -59,6 +59,13 @@ function ResultsPage() {
                       {p && <div className="mt-1 text-xs text-muted-foreground">Attempts: {p.attempts}{p.remote_id ? ` · ID ${p.remote_id}` : ""}</div>}
                       {p?.last_error && <div className="mt-1 text-xs text-destructive">{p.last_error}</div>}
                       {p?.permalink && <a href={p.permalink} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs text-teal underline">Open post <ExternalLink className="size-3" /></a>}
+                      {p?.status === "needs_finish" && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          <Button size="sm" variant="outline" onClick={async () => { const path = a.rendered_path ?? a.storage_path; const url = path ? await signedUrl(path) : null; if (url) window.open(url, "_blank"); else toast.error("File not available"); }}>Download Reel</Button>
+                          <Button size="sm" variant="teal" onClick={() => act(p.id, "published")}>I posted it in Instagram</Button>
+                          <Button size="sm" variant="ghost" onClick={() => act(p.id, "skip")}>Skip</Button>
+                        </div>
+                      )}
                       {p && (p.status === "unknown" || p.status === "failed") && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {p.status === "unknown" && <Button size="sm" variant="outline" onClick={() => act(p.id, "published")}>It is live</Button>}

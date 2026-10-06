@@ -50,6 +50,13 @@
       "when": 1791304804648,
       "tag": "0006_publishing_fixes",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791311505963,
+      "tag": "0007_reel_audio_modes",
+      "breakpoints": true
     }
   ]
 }
