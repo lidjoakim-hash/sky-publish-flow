@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Download, Eye, EyeOff, Film, Image as ImageIcon, Pencil } from "lucide-react";
+import { CalendarCheck, CalendarPlus, Download, Eye, EyeOff, Film, Image as ImageIcon, Pencil, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,7 +22,7 @@ export const Route = createFileRoute("/_authenticated/library")({
   component: LibraryPage,
 });
 
-type Filter = "all" | "reel" | "post" | "needs" | "skipped" | "seasonal";
+type Filter = "all" | "reel" | "post" | "needs" | "skipped" | "seasonal" | "scheduled" | "unscheduled";
 
 function LibraryPage() {
   const qc = useQueryClient();
@@ -40,10 +40,14 @@ function LibraryPage() {
         if (filter === "skipped") return a.skipped;
         if (filter === "seasonal") return a.seasonal;
         if (filter === "needs") return !a.skipped && readiness(a).some((r) => !r.startsWith("Seasonal"));
+        if (filter === "scheduled") return !a.skipped && !!a.scheduled_at;
+        if (filter === "unscheduled") return !a.skipped && !a.scheduled_at && a.upload_state === "done";
         return true;
-      }),
+      }).sort((a, b) => (filter === "scheduled" ? (a.scheduled_at ?? "").localeCompare(b.scheduled_at ?? "") : 0)),
     [assets, filter, q],
   );
+  const scheduledCount = assets.filter((a) => !a.skipped && a.scheduled_at).length;
+  const newCount = assets.filter((a) => !a.skipped && !a.scheduled_at && a.upload_state === "done").length;
 
   async function patch(id: string, p: Partial<Asset>) {
     const { error } = await supabase.from("assets").update(p).eq("id", id);
@@ -83,12 +87,21 @@ function LibraryPage() {
         subtitle={`Step 2 of 4 · ${counts.reel} Reels · ${counts.post} posts · ${counts.needs} need attention`}
         actions={<Button variant="outline" onClick={exportDraft} disabled={!assets.length}><Download /> Export draft</Button>}
       />
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3 shadow-card">
+        <Button size="sm" variant={filter === "scheduled" ? "teal" : "outline"} onClick={() => setFilter("scheduled")}><CalendarCheck /> Scheduled ({scheduledCount})</Button>
+        <Button size="sm" variant={filter === "unscheduled" ? "teal" : "outline"} onClick={() => setFilter("unscheduled")}><CalendarPlus /> Not scheduled yet ({newCount})</Button>
+        <Button size="sm" variant="teal" className="ml-auto" disabled={!newCount} asChild={newCount > 0}>
+          {newCount > 0 ? <Link to="/calendar" search={{ plan: "new" }}><Wand2 /> Schedule {newCount} new items</Link> : <span><Wand2 /> Nothing new to schedule</span>}
+        </Button>
+      </div>
       <div className="mb-4 flex flex-col gap-2 sm:flex-row">
         <Input placeholder="Search file, caption or topic" value={q} onChange={(e) => setQ(e.target.value)} className="h-11 sm:max-w-xs" />
         <Select value={filter} onValueChange={(v) => setFilter(v as Filter)}>
           <SelectTrigger className="h-11 sm:w-56"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Everything</SelectItem>
+            <SelectItem value="scheduled">Scheduled</SelectItem>
+            <SelectItem value="unscheduled">Not scheduled yet</SelectItem>
             <SelectItem value="reel">Reels</SelectItem>
             <SelectItem value="post">Image posts</SelectItem>
             <SelectItem value="needs">Needs attention</SelectItem>
