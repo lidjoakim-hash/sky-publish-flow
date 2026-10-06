@@ -47,28 +47,36 @@ export type Database = {
           audio_rms_db: number | null
           audio_state: string
           batch_id: string | null
+          brand_slug: string
+          bucket: string | null
           campaign_first: boolean
           caption: string | null
           caption_issue: string | null
           caption_source: string | null
+          classification_source: string | null
           cover_path: string | null
           created_at: string
           duration_s: number | null
           file_name: string
           height: number | null
+          hooks: string[]
           id: string
           kind: string
           mime: string | null
+          objective: string | null
           rel_path: string
           rendered_path: string | null
           rendered_verified: Json | null
+          review_status: string
           scheduled_at: string | null
           seasonal: boolean
           sha256: string
           size_bytes: number
           skipped: boolean
           sort_index: number
+          source_group: string | null
           storage_path: string | null
+          style_tags: string[]
           topics: string[]
           upload_state: string
           user_id: string
@@ -79,28 +87,36 @@ export type Database = {
           audio_rms_db?: number | null
           audio_state?: string
           batch_id?: string | null
+          brand_slug?: string
+          bucket?: string | null
           campaign_first?: boolean
           caption?: string | null
           caption_issue?: string | null
           caption_source?: string | null
+          classification_source?: string | null
           cover_path?: string | null
           created_at?: string
           duration_s?: number | null
           file_name: string
           height?: number | null
+          hooks?: string[]
           id?: string
           kind: string
           mime?: string | null
+          objective?: string | null
           rel_path: string
           rendered_path?: string | null
           rendered_verified?: Json | null
+          review_status?: string
           scheduled_at?: string | null
           seasonal?: boolean
           sha256: string
           size_bytes?: number
           skipped?: boolean
           sort_index?: number
+          source_group?: string | null
           storage_path?: string | null
+          style_tags?: string[]
           topics?: string[]
           upload_state?: string
           user_id?: string
@@ -111,28 +127,36 @@ export type Database = {
           audio_rms_db?: number | null
           audio_state?: string
           batch_id?: string | null
+          brand_slug?: string
+          bucket?: string | null
           campaign_first?: boolean
           caption?: string | null
           caption_issue?: string | null
           caption_source?: string | null
+          classification_source?: string | null
           cover_path?: string | null
           created_at?: string
           duration_s?: number | null
           file_name?: string
           height?: number | null
+          hooks?: string[]
           id?: string
           kind?: string
           mime?: string | null
+          objective?: string | null
           rel_path?: string
           rendered_path?: string | null
           rendered_verified?: Json | null
+          review_status?: string
           scheduled_at?: string | null
           seasonal?: boolean
           sha256?: string
           size_bytes?: number
           skipped?: boolean
           sort_index?: number
+          source_group?: string | null
           storage_path?: string | null
+          style_tags?: string[]
           topics?: string[]
           upload_state?: string
           user_id?: string
@@ -217,6 +241,114 @@ export type Database = {
         }
         Relationships: []
       }
+      brands: {
+        Row: {
+          created_at: string
+          focus: string | null
+          id: string
+          language: string
+          name: string
+          slug: string
+          strategy: Json
+          updated_at: string
+          user_id: string
+          verified_offers: string | null
+          voice: string | null
+        }
+        Insert: {
+          created_at?: string
+          focus?: string | null
+          id?: string
+          language?: string
+          name: string
+          slug: string
+          strategy?: Json
+          updated_at?: string
+          user_id?: string
+          verified_offers?: string | null
+          voice?: string | null
+        }
+        Update: {
+          created_at?: string
+          focus?: string | null
+          id?: string
+          language?: string
+          name?: string
+          slug?: string
+          strategy?: Json
+          updated_at?: string
+          user_id?: string
+          verified_offers?: string | null
+          voice?: string | null
+        }
+        Relationships: []
+      }
+      content_drafts: {
+        Row: {
+          brand_slug: string
+          brief: string
+          bucket: string | null
+          caption_draft: string | null
+          created_at: string
+          generator: string
+          hook: string
+          id: string
+          objective: string | null
+          render_job_id: string | null
+          source_asset_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand_slug?: string
+          brief: string
+          bucket?: string | null
+          caption_draft?: string | null
+          created_at?: string
+          generator?: string
+          hook: string
+          id?: string
+          objective?: string | null
+          render_job_id?: string | null
+          source_asset_id: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          brand_slug?: string
+          brief?: string
+          bucket?: string | null
+          caption_draft?: string | null
+          created_at?: string
+          generator?: string
+          hook?: string
+          id?: string
+          objective?: string | null
+          render_job_id?: string | null
+          source_asset_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_drafts_render_job_id_fkey"
+            columns: ["render_job_id"]
+            isOneToOne: false
+            referencedRelation: "render_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_drafts_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meta_connection: {
         Row: {
           checked_at: string | null
@@ -255,6 +387,74 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      metric_snapshots: {
+        Row: {
+          asset_id: string
+          brand_slug: string
+          captured_at: string
+          clicks: number | null
+          hours_since_publish: number | null
+          id: string
+          inquiries: number | null
+          note: string | null
+          platform: string
+          profile_actions: number | null
+          reach: number | null
+          saves: number | null
+          shares: number | null
+          source: string
+          unavailable: string[]
+          user_id: string
+          views: number | null
+        }
+        Insert: {
+          asset_id: string
+          brand_slug?: string
+          captured_at?: string
+          clicks?: number | null
+          hours_since_publish?: number | null
+          id?: string
+          inquiries?: number | null
+          note?: string | null
+          platform: string
+          profile_actions?: number | null
+          reach?: number | null
+          saves?: number | null
+          shares?: number | null
+          source?: string
+          unavailable?: string[]
+          user_id?: string
+          views?: number | null
+        }
+        Update: {
+          asset_id?: string
+          brand_slug?: string
+          captured_at?: string
+          clicks?: number | null
+          hours_since_publish?: number | null
+          id?: string
+          inquiries?: number | null
+          note?: string | null
+          platform?: string
+          profile_actions?: number | null
+          reach?: number | null
+          saves?: number | null
+          shares?: number | null
+          source?: string
+          unavailable?: string[]
+          user_id?: string
+          views?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metric_snapshots_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       publications: {
         Row: {
@@ -395,6 +595,7 @@ export type Database = {
       }
       settings: {
         Row: {
+          active_brand: string
           post_time: string
           post_times: string[]
           publishing_active: boolean
@@ -406,6 +607,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          active_brand?: string
           post_time?: string
           post_times?: string[]
           publishing_active?: boolean
@@ -417,6 +619,7 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          active_brand?: string
           post_time?: string
           post_times?: string[]
           publishing_active?: boolean
@@ -425,6 +628,36 @@ export type Database = {
           timezone?: string
           topic_mixing?: boolean
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      strategy_changes: {
+        Row: {
+          after: Json
+          applied_at: string
+          before: Json
+          brand_slug: string
+          id: string
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          after: Json
+          applied_at?: string
+          before: Json
+          brand_slug: string
+          id?: string
+          reason: string
+          user_id?: string
+        }
+        Update: {
+          after?: Json
+          applied_at?: string
+          before?: Json
+          brand_slug?: string
+          id?: string
+          reason?: string
           user_id?: string
         }
         Relationships: []
