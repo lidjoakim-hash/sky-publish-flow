@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Empty, PageHeader, Panel, PubBadge } from "@/components/app-ui";
 import { supabase } from "@/integrations/supabase/client";
 import { assetsQuery, publicationsQuery, settingsQuery, connectionQuery } from "@/lib/queries";
+import { TRENDING_LIMITATION, audioLabel, effectiveAudioMode } from "@/lib/reel-audio";
 import { addDays, formatOslo, osloDateKey } from "@/lib/schedule";
 import { planWithStrategy, lockedAssetIds } from "@/lib/plan";
 import type { StrategyPlanResult } from "@/lib/planner";
@@ -222,6 +223,7 @@ function CalendarPage() {
                   <Badge variant={a.kind === "reel" ? "teal" : "muted"} className="w-fit">{a.kind === "reel" ? "Reel" : "Post"}</Badge>
                   <div className="min-w-0 flex-1 truncate text-sm">{a.file_name}</div>
                   <div className="flex flex-wrap items-center gap-1 text-xs">
+                    {a.kind === "reel" && <span className="text-muted-foreground" title={TRENDING_LIMITATION}>{audioLabel(effectiveAudioMode(a.audio_mode, settings?.reel_audio_mode), a.finish_in_instagram)}</span>}
                     {!a.approved && <Badge variant="warning">Not approved</Badge>}
                     {a.seasonal && <Badge variant="warning">Seasonal</Badge>}
                     <span className="text-muted-foreground">IG</span><PubBadge status={pubBy.get(a.id)?.instagram} />

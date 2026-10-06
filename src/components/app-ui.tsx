@@ -49,6 +49,7 @@ export function AudioBadge({ state }: { state: string }) {
 
 const PUB_LABEL: Record<string, [string, "success" | "warning" | "danger" | "teal" | "muted"]> = { missed: ["Missed", "warning"],
   pending: ["Waiting", "muted"],
+  needs_finish: ["Finish in Instagram", "warning"],
   sending: ["Sending", "teal"],
   processing: ["Processing at Meta", "teal"],
   publishing: ["Publishing", "teal"],
