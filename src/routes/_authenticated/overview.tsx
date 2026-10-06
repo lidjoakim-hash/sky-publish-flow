@@ -13,6 +13,7 @@ import { readiness } from "@/lib/readiness";
 import { bucketLabel, sourceGroupOf } from "@/lib/strategy";
 import { metricsQuery } from "@/lib/queries";
 import { useActiveBrand } from "@/components/brand";
+import { MissedPanel } from "@/components/missed";
 
 export const Route = createFileRoute("/_authenticated/overview")({
   head: () => ({ meta: [{ title: "Overview — Skyline Publisher" }, { name: "description", content: "Remaining posts, next publication and setup tasks." }, { property: "og:title", content: "Overview — Skyline Publisher" }, { property: "og:description", content: "Remaining posts, next publication and setup tasks." }] }),
@@ -96,6 +97,7 @@ function Overview() {
           ))}
         </div>
       )}
+      <MissedPanel assets={assets} pubs={pubs} />
       <Panel title={`Strategy readiness · ${brand?.name ?? slug}`} className="mb-4">
         <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
           <div><div className="text-xs text-muted-foreground">Queue coverage</div><div className="font-display text-xl font-bold">{st.days} days</div></div>
