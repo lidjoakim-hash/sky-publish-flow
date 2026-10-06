@@ -86,12 +86,18 @@ export interface Suggestion {
 
 /** Keyword-based suggestion from file name, topics and caption text. Never vision analysis. */
 export function suggestClassification(a: { file_name: string; caption?: string | null; topics?: string[] | null }): Suggestion {
-  const text = [a.file_name.replace(/[_-]/g, " "), (a.topics ?? []).join(" "), a.caption ?? ""].join(" ");
-  for (const r of RULES) {
-    const m = text.match(r.words);
-    if (m) {
-      const leads = r.bucket === "lead_generation" || r.bucket === "offer" || r.bucket === "proof";
-      return { bucket: r.bucket, objective: leads ? "leads" : "reach", reason: `Suggested from the word "${m[0]}" in file name/tags/caption` };
+  // File name and owner tags first; captions often end with a generic call-to-action, so they come second.
+  const sources: [string, string][] = [
+    ["file name/tags", [a.file_name.replace(/[_-]/g, " "), (a.topics ?? []).join(" ")].join(" ")],
+    ["caption", a.caption ?? ""],
+  ];
+  for (const [where, text] of sources) {
+    for (const r of RULES) {
+      const m = text.match(r.words);
+      if (m) {
+        const leads = r.bucket === "lead_generation" || r.bucket === "offer" || r.bucket === "proof";
+        return { bucket: r.bucket, objective: leads ? "leads" : "reach", reason: `Suggested from the word "${m[0]}" in the ${where}` };
+      }
     }
   }
   return { bucket: null, objective: "reach", reason: "No keyword match — left unclassified" };
