@@ -16,8 +16,10 @@ import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedConnectionsRouteImport } from './routes/_authenticated/connections'
 import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated/import'
 import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
+import { Route as AuthenticatedOrganizeRouteImport } from './routes/_authenticated/organize'
 import { Route as AuthenticatedOverviewRouteImport } from './routes/_authenticated/overview'
 import { Route as AuthenticatedResultsRouteImport } from './routes/_authenticated/results'
+import { Route as AuthenticatedStrategyRouteImport } from './routes/_authenticated/strategy'
 import { Route as ApiPublicCronPublishRouteImport } from './routes/api/public/cron/publish'
 import { Route as ApiPublicWorkerClaimRouteImport } from './routes/api/public/worker/claim'
 import { Route as ApiPublicWorkerUpdateRouteImport } from './routes/api/public/worker/update'
@@ -57,6 +59,11 @@ const AuthenticatedLibraryRoute = AuthenticatedLibraryRouteImport.update({
   path: '/library',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedOrganizeRoute = AuthenticatedOrganizeRouteImport.update({
+  id: '/organize',
+  path: '/organize',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedOverviewRoute = AuthenticatedOverviewRouteImport.update({
   id: '/overview',
   path: '/overview',
@@ -65,6 +72,11 @@ const AuthenticatedOverviewRoute = AuthenticatedOverviewRouteImport.update({
 const AuthenticatedResultsRoute = AuthenticatedResultsRouteImport.update({
   id: '/results',
   path: '/results',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedStrategyRoute = AuthenticatedStrategyRouteImport.update({
+  id: '/strategy',
+  path: '/strategy',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const ApiPublicCronPublishRoute = ApiPublicCronPublishRouteImport.update({
@@ -90,8 +102,10 @@ export interface FileRoutesByFullPath {
   '/connections': typeof AuthenticatedConnectionsRoute
   '/import': typeof AuthenticatedImportRoute
   '/library': typeof AuthenticatedLibraryRoute
+  '/organize': typeof AuthenticatedOrganizeRoute
   '/overview': typeof AuthenticatedOverviewRoute
   '/results': typeof AuthenticatedResultsRoute
+  '/strategy': typeof AuthenticatedStrategyRoute
   '/api/public/cron/publish': typeof ApiPublicCronPublishRoute
   '/api/public/worker/claim': typeof ApiPublicWorkerClaimRoute
   '/api/public/worker/update': typeof ApiPublicWorkerUpdateRoute
@@ -103,8 +117,10 @@ export interface FileRoutesByTo {
   '/connections': typeof AuthenticatedConnectionsRoute
   '/import': typeof AuthenticatedImportRoute
   '/library': typeof AuthenticatedLibraryRoute
+  '/organize': typeof AuthenticatedOrganizeRoute
   '/overview': typeof AuthenticatedOverviewRoute
   '/results': typeof AuthenticatedResultsRoute
+  '/strategy': typeof AuthenticatedStrategyRoute
   '/api/public/cron/publish': typeof ApiPublicCronPublishRoute
   '/api/public/worker/claim': typeof ApiPublicWorkerClaimRoute
   '/api/public/worker/update': typeof ApiPublicWorkerUpdateRoute
@@ -118,8 +134,10 @@ export interface FileRoutesById {
   '/_authenticated/connections': typeof AuthenticatedConnectionsRoute
   '/_authenticated/import': typeof AuthenticatedImportRoute
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
+  '/_authenticated/organize': typeof AuthenticatedOrganizeRoute
   '/_authenticated/overview': typeof AuthenticatedOverviewRoute
   '/_authenticated/results': typeof AuthenticatedResultsRoute
+  '/_authenticated/strategy': typeof AuthenticatedStrategyRoute
   '/api/public/cron/publish': typeof ApiPublicCronPublishRoute
   '/api/public/worker/claim': typeof ApiPublicWorkerClaimRoute
   '/api/public/worker/update': typeof ApiPublicWorkerUpdateRoute
@@ -133,8 +151,10 @@ export interface FileRouteTypes {
     | '/connections'
     | '/import'
     | '/library'
+    | '/organize'
     | '/overview'
     | '/results'
+    | '/strategy'
     | '/api/public/cron/publish'
     | '/api/public/worker/claim'
     | '/api/public/worker/update'
@@ -146,8 +166,10 @@ export interface FileRouteTypes {
     | '/connections'
     | '/import'
     | '/library'
+    | '/organize'
     | '/overview'
     | '/results'
+    | '/strategy'
     | '/api/public/cron/publish'
     | '/api/public/worker/claim'
     | '/api/public/worker/update'
@@ -160,8 +182,10 @@ export interface FileRouteTypes {
     | '/_authenticated/connections'
     | '/_authenticated/import'
     | '/_authenticated/library'
+    | '/_authenticated/organize'
     | '/_authenticated/overview'
     | '/_authenticated/results'
+    | '/_authenticated/strategy'
     | '/api/public/cron/publish'
     | '/api/public/worker/claim'
     | '/api/public/worker/update'
@@ -226,6 +250,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLibraryRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/organize': {
+      id: '/_authenticated/organize'
+      path: '/organize'
+      fullPath: '/organize'
+      preLoaderRoute: typeof AuthenticatedOrganizeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/overview': {
       id: '/_authenticated/overview'
       path: '/overview'
@@ -238,6 +269,13 @@ declare module '@tanstack/react-router' {
       path: '/results'
       fullPath: '/results'
       preLoaderRoute: typeof AuthenticatedResultsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/strategy': {
+      id: '/_authenticated/strategy'
+      path: '/strategy'
+      fullPath: '/strategy'
+      preLoaderRoute: typeof AuthenticatedStrategyRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/api/public/cron/publish': {
@@ -270,8 +308,10 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedConnectionsRoute: typeof AuthenticatedConnectionsRoute
   AuthenticatedImportRoute: typeof AuthenticatedImportRoute
   AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRoute
+  AuthenticatedOrganizeRoute: typeof AuthenticatedOrganizeRoute
   AuthenticatedOverviewRoute: typeof AuthenticatedOverviewRoute
   AuthenticatedResultsRoute: typeof AuthenticatedResultsRoute
+  AuthenticatedStrategyRoute: typeof AuthenticatedStrategyRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -280,8 +320,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedConnectionsRoute: AuthenticatedConnectionsRoute,
   AuthenticatedImportRoute: AuthenticatedImportRoute,
   AuthenticatedLibraryRoute: AuthenticatedLibraryRoute,
+  AuthenticatedOrganizeRoute: AuthenticatedOrganizeRoute,
   AuthenticatedOverviewRoute: AuthenticatedOverviewRoute,
   AuthenticatedResultsRoute: AuthenticatedResultsRoute,
+  AuthenticatedStrategyRoute: AuthenticatedStrategyRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
