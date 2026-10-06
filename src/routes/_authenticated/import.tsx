@@ -80,12 +80,35 @@ function ImportPage() {
   }
 
   const pick = (input: HTMLInputElement | null) => input?.click();
+  const [dragging, setDragging] = useState(false);
+
+  async function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    if (running) return;
+    const items = [...e.dataTransfer.items].map((i) => i.webkitGetAsEntry?.()).filter(Boolean) as FileSystemEntry[];
+    const single = e.dataTransfer.files;
+    if (items.length === 1 && items[0]!.isFile && single[0]?.name.toLowerCase().endsWith(".zip")) return start({ kind: "zip", file: single[0] });
+    const out = await collectDropped(items);
+    if (!out.length) return toast.error("Nothing to import in what you dropped.");
+    start({ kind: "files", files: out });
+  }
 
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader title="Add batch" subtitle="Step 1 of 4 · Choose your files. Originals and captions are kept exactly as provided." />
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel className="lg:col-span-2" title="Choose files">
+          <div
+            onDragOver={(e) => { e.preventDefault(); if (!running) setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={onDrop}
+            className={`mb-4 rounded-xl border-2 border-dashed p-6 text-center text-sm transition-colors ${dragging ? "border-teal bg-accent text-accent-foreground" : "text-muted-foreground"}`}
+          >
+            <FolderOpen className="mx-auto mb-2 size-6 text-teal" />
+            <span className="font-medium">Drag your folder, files or ZIP here</span>
+            <span className="block text-xs">Subfolders such as First_Campaign are kept.</span>
+          </div>
           <div className="mb-4 grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="bn">Batch name</Label>
@@ -191,4 +214,25 @@ function ImportPage() {
       </div>
     </div>
   );
+}
+
+/** Walks dropped folders and keeps each file's folder path (needed for caption matching and First_Campaign). */
+async function collectDropped(entries: FileSystemEntry[]): Promise<File[]> {
+  const out: File[] = [];
+  const walk = async (entry: FileSystemEntry, prefix: string): Promise<void> => {
+    if (entry.isFile) {
+      const f = await new Promise<File>((res, rej) => (entry as FileSystemFileEntry).file(res, rej));
+      Object.defineProperty(f, "webkitRelativePath", { value: prefix + f.name });
+      out.push(f);
+    } else if (entry.isDirectory) {
+      const reader = (entry as FileSystemDirectoryEntry).createReader();
+      for (;;) {
+        const batch = await new Promise<FileSystemEntry[]>((res, rej) => reader.readEntries(res, rej));
+        if (!batch.length) break;
+        for (const child of batch) await walk(child, `${prefix}${entry.name}/`);
+      }
+    }
+  };
+  for (const e of entries) await walk(e, "");
+  return out;
 }
