@@ -1,7 +1,7 @@
 /** Strategy-aware slot planner. Pure: no I/O. Fills the same Oslo slots as assignSchedule, but
  * rotates buckets, avoids consecutive repeats of source/hook, honours a source cooldown and leaves a
  * slot empty (reported as a shortage) rather than filling it with a repeat. */
-import { addDays, zonedToUtc } from "./schedule";
+import { addDays, jitteredSlot, slotOccupied } from "./schedule";
 import { UNCLASSIFIED } from "./strategy";
 
 export interface PlanItem {
@@ -34,6 +34,8 @@ export interface StrategyPlanOptions {
   cooldownDays?: number;
   minSpacingHours?: number;
   maxDays?: number;
+  /** Random-looking ±minutes offset per slot (deterministic). */
+  jitterMinutes?: number;
 }
 
 export interface Shortage { at: string; kind: "post" | "reel"; reason: string }
@@ -68,15 +70,15 @@ export function strategyPlan(items: PlanItem[], o: StrategyPlanOptions): Strateg
     // All of the day's slots, both kinds, in chronological order.
     const date = addDays(o.startDate, d);
     const slots = [
-      ...postTimes.map((t) => ({ kind: "post" as const, at: zonedToUtc(date, t, tz) })),
-      ...reelTimes.map((t) => ({ kind: "reel" as const, at: zonedToUtc(date, t, tz) })),
+      ...postTimes.map((t) => ({ kind: "post" as const, at: jitteredSlot(date, t, tz, "post", o.jitterMinutes ?? 0) })),
+      ...reelTimes.map((t) => ({ kind: "reel" as const, at: jitteredSlot(date, t, tz, "reel", o.jitterMinutes ?? 0) })),
     ].sort((a, b) => a.at.getTime() - b.at.getTime());
     for (const { kind, at } of slots) {
       const pool = pools[kind];
       if (!pool.length) continue;
       const ms = at.getTime();
       const iso = at.toISOString();
-      if (at <= o.notBefore || taken.has(iso)) continue;
+      if (at <= o.notBefore || taken.has(iso) || slotOccupied(takenMs, ms, o.jitterMinutes ?? 0)) continue;
       if (spacing && takenMs.some((x) => Math.abs(x - ms) < spacing)) continue;
       // Chronological neighbours of any kind (history may include later, already-dated items).
       const prev = placed.filter((h) => h.ms < ms).sort((a, b) => b.ms - a.ms)[0];

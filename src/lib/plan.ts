@@ -1,6 +1,9 @@
 import { REPLANNABLE } from "./publishing-rules";
 import type { Asset, Publication } from "./queries";
 import { assignSchedule } from "./schedule";
+
+/** Posting times vary by up to ± this many minutes around the chosen times so they don't look machine-exact. */
+export const SLOT_JITTER_MINUTES = 5;
 import { strategyPlan, type HistoryEntry, type StrategyPlanResult } from "./planner";
 import { sourceGroupOf, type BrandStrategy } from "./strategy";
 
@@ -37,7 +40,7 @@ export function planSchedule(i: PlanInput): Map<string, string> {
   const ordered = [...moving].sort((a, b) => Number(b.campaign_first) - Number(a.campaign_first) || a.sort_index - b.sort_index);
   return assignSchedule(
     ordered.map((a) => ({ id: a.id, kind: a.kind as "reel" | "post", topics: a.topics })),
-    { startDate: i.startDate, postTimes: i.postTimes.map((t) => t.slice(0, 5)), reelTime: i.reelTime.slice(0, 5), timeZone: i.timeZone, taken, notBefore: now, topicMixing: i.topicMixing },
+    { startDate: i.startDate, postTimes: i.postTimes.map((t) => t.slice(0, 5)), reelTime: i.reelTime.slice(0, 5), timeZone: i.timeZone, taken, notBefore: now, topicMixing: i.topicMixing, jitterMinutes: SLOT_JITTER_MINUTES },
   );
 }
 
@@ -85,6 +88,7 @@ export function planWithStrategy(i: StrategyPlanInput): StrategyPlanResult {
       weights: i.strategy.weights ?? {},
       cooldownDays: i.strategy.cooldownDays ?? 0,
       minSpacingHours: q?.minSpacingHours ?? 0,
+      jitterMinutes: SLOT_JITTER_MINUTES,
     },
   );
   return { ...res, held: [...held, ...res.held] };
