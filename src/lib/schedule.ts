@@ -68,6 +68,7 @@ export interface ScheduleOptions {
   /** Slots must be strictly after this instant. */
   notBefore: Date;
   topicMixing?: boolean;
+  jitterMinutes?: number;
 }
 
 /** Reorders so consecutive items avoid sharing the first topic label where possible (stable otherwise). */
