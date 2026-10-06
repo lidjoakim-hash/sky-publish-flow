@@ -43,6 +43,13 @@
       "when": 1791264645990,
       "tag": "0005_commit_schedule_definer",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791304804648,
+      "tag": "0006_publishing_fixes",
+      "breakpoints": true
     }
   ]
 }
