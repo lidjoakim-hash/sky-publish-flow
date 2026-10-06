@@ -38,7 +38,7 @@ function CalendarPage() {
   const activate = useServerFn(activatePublishing);
   const commit = useServerFn(commitSchedule);
   const { slug, strategy } = useActiveBrand();
-  const [preview, setPreview] = useState<(StrategyPlanResult & { mode: string }) | null>(null);
+  const [preview, setPreview] = useState<(StrategyPlanResult & { mode: "append" | "reschedule" | "missed"; startDate: string }) | null>(null);
   const tomorrow = addDays(osloDateKey(new Date()), 1);
   const [start, setStart] = useState(tomorrow);
   const [postTimes, setPostTimes] = useState<string[]>(["09:00", "13:00", "18:00"]);
@@ -77,14 +77,18 @@ function CalendarPage() {
     await saveSettings();
     const res = planWithStrategy({ assets, pubs, startDate: mode === "missed" ? tomorrow : start, postTimes, reelTime, timeZone: settings?.timezone ?? "Europe/Oslo", topicMixing: mixing, mode, brand: slug, strategy });
     if (!res.assignments.size && !res.held.length) return toast("Nothing to schedule.");
-    setPreview({ ...res, mode });
+    setPreview({ ...res, mode, startDate: start });
   }
 
   async function commitPreview() {
     if (!preview) return;
-    const r = await commit({ data: { brand: slug, assignments: [...preview.assignments].map(([id, at]) => ({ id, at })) } });
+    try {
+      const r = await commit({ data: { brand: slug, mode: preview.mode, startDate: preview.startDate, assignments: [...preview.assignments].map(([id, at]) => ({ id, at })) } });
+      (r.saved ? toast.success : toast.error)(r.message);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
     setPreview(null);
-    toast.success(`${r.saved} items dated. Review them, then approve.${r.rejected.length ? ` ${r.rejected.length} refused by the server.` : ""}`);
     qc.invalidateQueries({ queryKey: ["assets"] });
   }
 

@@ -1,48 +1,65 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const WAITING = ["pending", "retry", "skipped"];
+type CommitInput = { brand: string; mode: "append" | "reschedule" | "missed"; startDate: string; assignments: { id: string; at: string }[] };
 
-/** Server-side validation + commit of a previewed plan. Never touches locked, skipped, rejected or other-brand items. */
+function validateCommit(d: unknown): CommitInput {
+  const x = d as CommitInput;
+  if (!x || typeof x.brand !== "string" || !/^[a-z0-9_-]{1,40}$/.test(x.brand)) throw new Error("Invalid brand");
+  if (!["append", "reschedule", "missed"].includes(x.mode)) throw new Error("Invalid mode");
+  if (typeof x.startDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(x.startDate)) throw new Error("Invalid start date");
+  if (!Array.isArray(x.assignments) || x.assignments.length > 2000) throw new Error("Invalid plan");
+  const ids = new Set<string>();
+  for (const a of x.assignments) {
+    if (!a || typeof a.id !== "string" || typeof a.at !== "string" || Number.isNaN(new Date(a.at).getTime())) throw new Error("Invalid plan entry");
+    if (ids.has(a.id)) throw new Error("Duplicate item in plan");
+    ids.add(a.id);
+  }
+  return x;
+}
+
+/**
+ * Commits a previewed plan. The server recomputes the plan from persisted assets, publications,
+ * settings and brand strategy; if it differs from the preview the commit is refused (stale preview).
+ * The write itself is the commit_schedule database function: one transaction with fresh row locks,
+ * lock/lease, brand and collision checks — all-or-nothing.
+ */
 export const commitSchedule = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { brand: string; assignments: { id: string; at: string }[] }) => {
-    if (!Array.isArray(d.assignments) || d.assignments.length > 2000) throw new Error("Invalid plan");
-    return d;
-  })
+  .inputValidator(validateCommit)
   .handler(async ({ context, data }) => {
     const { supabase } = context;
-    const now = Date.now();
-    const ids = data.assignments.map((a) => a.id);
-    const rows: { id: string; brand_slug: string; skipped: boolean; upload_state: string; review_status: string; scheduled_at: string | null }[] = [];
-    for (let i = 0; i < ids.length; i += 200) {
-      const { data: r, error } = await supabase.from("assets").select("id, brand_slug, skipped, upload_state, review_status, scheduled_at").in("id", ids.slice(i, i + 200));
-      if (error) throw error;
-      rows.push(...(r ?? []));
-    }
-    const byId = new Map(rows.map((r) => [r.id, r]));
-    const { data: pubs } = await supabase.from("publications").select("asset_id, status").in("asset_id", ids.slice(0, 1000));
-    const locked = new Set((pubs ?? []).filter((p) => !WAITING.includes(p.status)).map((p) => p.asset_id));
-    const { data: others } = await supabase.from("assets").select("id, scheduled_at").not("scheduled_at", "is", null).limit(10000);
-    const movingSet = new Set(ids);
-    const taken = new Set((others ?? []).filter((o) => !movingSet.has(o.id)).map((o) => new Date(o.scheduled_at!).toISOString()));
-    const rejected: string[] = [];
-    const ok: { id: string; at: string }[] = [];
-    for (const a of data.assignments) {
-      const r = byId.get(a.id);
-      const t = new Date(a.at);
-      const iso = Number.isNaN(t.getTime()) ? "" : t.toISOString();
-      const why = !r ? "not found" : r.brand_slug !== data.brand ? "other brand" : r.skipped ? "skipped" : r.upload_state !== "done" ? "not uploaded" : r.review_status === "reject" ? "marked do not use" : locked.has(a.id) ? "already publishing/published" : !iso || t.getTime() <= now ? "slot in the past" : taken.has(iso) ? "slot already taken" : null;
-      if (why) rejected.push(`${a.id.slice(0, 8)}: ${why}`);
-      else {
-        taken.add(iso);
-        ok.push({ id: a.id, at: iso });
+    const { planWithStrategy } = await import("./plan");
+    const { addDays, osloDateKey } = await import("./schedule");
+    const page = async <T,>(q: (f: number, t: number) => PromiseLike<{ data: T[] | null; error: unknown }>) => {
+      const out: T[] = [];
+      for (let f = 0; ; f += 1000) {
+        const { data: rows, error } = await q(f, f + 999);
+        if (error) throw new Error("Could not read current data; nothing was saved.");
+        out.push(...(rows ?? []));
+        if (!rows || rows.length < 1000) return out;
       }
-    }
-    for (let i = 0; i < ok.length; i += 25) {
-      await Promise.all(ok.slice(i, i + 25).map((a) => supabase.from("assets").update({ scheduled_at: a.at, approved: false }).eq("id", a.id)));
-    }
-    return { saved: ok.length, rejected };
+    };
+    const assets = await page((f, t) => supabase.from("assets").select("*").order("sort_index").range(f, t));
+    const pubs = await page((f, t) => supabase.from("publications").select("*").range(f, t));
+    const { data: settings, error: se } = await supabase.from("settings").select("*").maybeSingle();
+    const { data: brand, error: be } = await supabase.from("brands").select("strategy").eq("slug", data.brand).maybeSingle();
+    if (se || be || !settings) throw new Error("Could not read settings; nothing was saved.");
+    const today = osloDateKey(new Date());
+    const startDate = data.mode === "missed" ? addDays(today, 1) : data.startDate;
+    if (startDate <= today) throw new Error("Choose a future start date.");
+    const plan = planWithStrategy({
+      assets, pubs, startDate, mode: data.mode, brand: data.brand,
+      postTimes: settings.post_times?.length ? settings.post_times : [settings.post_time],
+      reelTime: settings.reel_time, timeZone: settings.timezone, topicMixing: settings.topic_mixing,
+      strategy: (brand?.strategy ?? {}) as never,
+    });
+    const sent = new Map(data.assignments.map((a) => [a.id, new Date(a.at).toISOString()]));
+    const same = sent.size === plan.assignments.size && [...plan.assignments].every(([id, at]) => sent.get(id) === at);
+    if (!same) return { saved: 0, stale: true, message: "Your data or settings changed since the preview. Preview again — nothing was saved." };
+    const { data: n, error } = await supabase.rpc("commit_schedule", { _brand: data.brand, _items: [...plan.assignments].map(([id, at]) => ({ id, at })) });
+    if (error) return { saved: 0, stale: false, message: `Nothing was saved: ${error.message}` };
+    return { saved: n ?? 0, stale: false, message: `${n} items dated. Review them, then approve.` };
   });
 
 /** Pulls Meta insights for published Skyline items using the server-side token. Missing metrics are recorded as unavailable, not zero. */
