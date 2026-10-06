@@ -14,10 +14,12 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedAudioRouteImport } from './routes/_authenticated/audio'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
 import { Route as AuthenticatedConnectionsRouteImport } from './routes/_authenticated/connections'
+import { Route as AuthenticatedIdeasRouteImport } from './routes/_authenticated/ideas'
 import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated/import'
 import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
 import { Route as AuthenticatedOrganizeRouteImport } from './routes/_authenticated/organize'
 import { Route as AuthenticatedOverviewRouteImport } from './routes/_authenticated/overview'
+import { Route as AuthenticatedPerformanceRouteImport } from './routes/_authenticated/performance'
 import { Route as AuthenticatedResultsRouteImport } from './routes/_authenticated/results'
 import { Route as AuthenticatedStrategyRouteImport } from './routes/_authenticated/strategy'
 import { Route as ApiPublicCronPublishRouteImport } from './routes/api/public/cron/publish'
@@ -49,6 +51,11 @@ const AuthenticatedConnectionsRoute =
     path: '/connections',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedIdeasRoute = AuthenticatedIdeasRouteImport.update({
+  id: '/ideas',
+  path: '/ideas',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedImportRoute = AuthenticatedImportRouteImport.update({
   id: '/import',
   path: '/import',
@@ -69,6 +76,12 @@ const AuthenticatedOverviewRoute = AuthenticatedOverviewRouteImport.update({
   path: '/overview',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPerformanceRoute =
+  AuthenticatedPerformanceRouteImport.update({
+    id: '/performance',
+    path: '/performance',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedResultsRoute = AuthenticatedResultsRouteImport.update({
   id: '/results',
   path: '/results',
@@ -100,10 +113,12 @@ export interface FileRoutesByFullPath {
   '/audio': typeof AuthenticatedAudioRoute
   '/calendar': typeof AuthenticatedCalendarRoute
   '/connections': typeof AuthenticatedConnectionsRoute
+  '/ideas': typeof AuthenticatedIdeasRoute
   '/import': typeof AuthenticatedImportRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/organize': typeof AuthenticatedOrganizeRoute
   '/overview': typeof AuthenticatedOverviewRoute
+  '/performance': typeof AuthenticatedPerformanceRoute
   '/results': typeof AuthenticatedResultsRoute
   '/strategy': typeof AuthenticatedStrategyRoute
   '/api/public/cron/publish': typeof ApiPublicCronPublishRoute
@@ -115,10 +130,12 @@ export interface FileRoutesByTo {
   '/audio': typeof AuthenticatedAudioRoute
   '/calendar': typeof AuthenticatedCalendarRoute
   '/connections': typeof AuthenticatedConnectionsRoute
+  '/ideas': typeof AuthenticatedIdeasRoute
   '/import': typeof AuthenticatedImportRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/organize': typeof AuthenticatedOrganizeRoute
   '/overview': typeof AuthenticatedOverviewRoute
+  '/performance': typeof AuthenticatedPerformanceRoute
   '/results': typeof AuthenticatedResultsRoute
   '/strategy': typeof AuthenticatedStrategyRoute
   '/api/public/cron/publish': typeof ApiPublicCronPublishRoute
@@ -132,10 +149,12 @@ export interface FileRoutesById {
   '/_authenticated/audio': typeof AuthenticatedAudioRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
   '/_authenticated/connections': typeof AuthenticatedConnectionsRoute
+  '/_authenticated/ideas': typeof AuthenticatedIdeasRoute
   '/_authenticated/import': typeof AuthenticatedImportRoute
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
   '/_authenticated/organize': typeof AuthenticatedOrganizeRoute
   '/_authenticated/overview': typeof AuthenticatedOverviewRoute
+  '/_authenticated/performance': typeof AuthenticatedPerformanceRoute
   '/_authenticated/results': typeof AuthenticatedResultsRoute
   '/_authenticated/strategy': typeof AuthenticatedStrategyRoute
   '/api/public/cron/publish': typeof ApiPublicCronPublishRoute
@@ -149,10 +168,12 @@ export interface FileRouteTypes {
     | '/audio'
     | '/calendar'
     | '/connections'
+    | '/ideas'
     | '/import'
     | '/library'
     | '/organize'
     | '/overview'
+    | '/performance'
     | '/results'
     | '/strategy'
     | '/api/public/cron/publish'
@@ -164,10 +185,12 @@ export interface FileRouteTypes {
     | '/audio'
     | '/calendar'
     | '/connections'
+    | '/ideas'
     | '/import'
     | '/library'
     | '/organize'
     | '/overview'
+    | '/performance'
     | '/results'
     | '/strategy'
     | '/api/public/cron/publish'
@@ -180,10 +203,12 @@ export interface FileRouteTypes {
     | '/_authenticated/audio'
     | '/_authenticated/calendar'
     | '/_authenticated/connections'
+    | '/_authenticated/ideas'
     | '/_authenticated/import'
     | '/_authenticated/library'
     | '/_authenticated/organize'
     | '/_authenticated/overview'
+    | '/_authenticated/performance'
     | '/_authenticated/results'
     | '/_authenticated/strategy'
     | '/api/public/cron/publish'
@@ -236,6 +261,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedConnectionsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/ideas': {
+      id: '/_authenticated/ideas'
+      path: '/ideas'
+      fullPath: '/ideas'
+      preLoaderRoute: typeof AuthenticatedIdeasRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/import': {
       id: '/_authenticated/import'
       path: '/import'
@@ -262,6 +294,13 @@ declare module '@tanstack/react-router' {
       path: '/overview'
       fullPath: '/overview'
       preLoaderRoute: typeof AuthenticatedOverviewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/performance': {
+      id: '/_authenticated/performance'
+      path: '/performance'
+      fullPath: '/performance'
+      preLoaderRoute: typeof AuthenticatedPerformanceRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/results': {
@@ -306,10 +345,12 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAudioRoute: typeof AuthenticatedAudioRoute
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
   AuthenticatedConnectionsRoute: typeof AuthenticatedConnectionsRoute
+  AuthenticatedIdeasRoute: typeof AuthenticatedIdeasRoute
   AuthenticatedImportRoute: typeof AuthenticatedImportRoute
   AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRoute
   AuthenticatedOrganizeRoute: typeof AuthenticatedOrganizeRoute
   AuthenticatedOverviewRoute: typeof AuthenticatedOverviewRoute
+  AuthenticatedPerformanceRoute: typeof AuthenticatedPerformanceRoute
   AuthenticatedResultsRoute: typeof AuthenticatedResultsRoute
   AuthenticatedStrategyRoute: typeof AuthenticatedStrategyRoute
 }
@@ -318,10 +359,12 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAudioRoute: AuthenticatedAudioRoute,
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
   AuthenticatedConnectionsRoute: AuthenticatedConnectionsRoute,
+  AuthenticatedIdeasRoute: AuthenticatedIdeasRoute,
   AuthenticatedImportRoute: AuthenticatedImportRoute,
   AuthenticatedLibraryRoute: AuthenticatedLibraryRoute,
   AuthenticatedOrganizeRoute: AuthenticatedOrganizeRoute,
   AuthenticatedOverviewRoute: AuthenticatedOverviewRoute,
+  AuthenticatedPerformanceRoute: AuthenticatedPerformanceRoute,
   AuthenticatedResultsRoute: AuthenticatedResultsRoute,
   AuthenticatedStrategyRoute: AuthenticatedStrategyRoute,
 }
