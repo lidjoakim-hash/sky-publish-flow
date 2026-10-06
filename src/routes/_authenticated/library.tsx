@@ -15,6 +15,7 @@ import { assetsQuery, signedUrl, type Asset } from "@/lib/queries";
 import { formatOslo } from "@/lib/schedule";
 import { readiness } from "@/lib/readiness";
 import { metaIssues } from "@/lib/meta-format";
+import { AUDIO_MODES, AUDIO_MODE_LABEL, TRENDING_LIMITATION } from "@/lib/reel-audio";
 
 export const Route = createFileRoute("/_authenticated/library")({
   head: () => ({ meta: [{ title: "Library — Skyline Publisher" }, { name: "description", content: "Review media, captions and readiness." }, { property: "og:title", content: "Library — Skyline Publisher" }, { property: "og:description", content: "Review media, captions and readiness." }] }),
@@ -151,10 +152,14 @@ function EditDialog({ asset, onClose, onSave }: { asset: Asset | null; onClose: 
   const [caption, setCaption] = useState("");
   const [topics, setTopics] = useState("");
   const [lastId, setLastId] = useState<string | null>(null);
+  const [audio, setAudio] = useState("");
+  const [finish, setFinish] = useState(false);
   if (asset && asset.id !== lastId) {
     setLastId(asset.id);
     setCaption(asset.caption ?? "");
     setTopics(asset.topics.join(", "));
+    setAudio(asset.audio_mode ?? "");
+    setFinish(asset.finish_in_instagram);
   }
   return (
     <Dialog open={!!asset} onOpenChange={(o) => !o && onClose()}>
