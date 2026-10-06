@@ -63,7 +63,7 @@ function SignIn() {
       <div className="flex items-center justify-center p-6">
         <form onSubmit={submit} className="w-full max-w-sm space-y-5">
           <div>
-            <h2 className="text-2xl font-bold">{mode === "in" ? "Sign in" : "Create account"}</h2>
+            <h2 className="text-2xl font-bold">Sign in</h2>
             <p className="text-sm text-muted-foreground">Your media and accounts stay private to you.</p>
           </div>
           <Button type="button" variant="outline" className="w-full" onClick={google}>
@@ -79,11 +79,9 @@ function SignIn() {
             <Input id="pw" type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} className="h-11" />
           </div>
           <Button type="submit" variant="teal" className="w-full" disabled={busy}>
-            {mode === "in" ? "Sign in" : "Create account"}
+            Sign in
           </Button>
-          <button type="button" className="w-full text-sm text-muted-foreground underline" onClick={() => setMode(mode === "in" ? "up" : "in")}>
-            {mode === "in" ? "New here? Create an account" : "Already have an account? Sign in"}
-          </button>
+          <p className="text-center text-xs text-muted-foreground">Private workspace — ask the owner for access.</p>
         </form>
       </div>
     </div>
