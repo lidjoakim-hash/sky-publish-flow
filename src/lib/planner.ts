@@ -75,7 +75,8 @@ export function strategyPlan(items: PlanItem[], o: StrategyPlanOptions): Strateg
         const prev = placed.filter((h) => h.kind === kind && new Date(h.at).getTime() < ms).sort((a, b) => b.at.localeCompare(a.at))[0];
         const reasons = new Set<string>();
         const eligible = pool.filter((it) => {
-          if (prev && prev.sourceGroup === it.sourceGroup) return reasons.add("same source/session as the previous item"), false;
+          // Back-to-back repeats of one source are allowed only after a full day (or the cooldown) has passed.
+          if (prev && prev.sourceGroup === it.sourceGroup && ms - new Date(prev.at).getTime() < Math.max(cooldown, DAY)) return reasons.add("same source/session as the previous item"), false;
           if (prev && it.hook && prev.hook === it.hook) return reasons.add("same hook as the previous item"), false;
           if (cooldown && placed.some((h) => h.sourceGroup === it.sourceGroup && Math.abs(new Date(h.at).getTime() - ms) < cooldown))
             return reasons.add("source cooldown"), false;

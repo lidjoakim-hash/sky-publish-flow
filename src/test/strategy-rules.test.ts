@@ -16,11 +16,11 @@ describe("strategy planner", () => {
     expect(order).toEqual(["a", "b", "a", "b"]);
   });
 
-  it("never schedules the same source back to back and leaves the slot empty instead", () => {
+  it("does not repeat a source within a day and leaves slots empty instead", () => {
     const items = [item("x1", { sourceGroup: "s" }), item("x2", { sourceGroup: "s" })];
     const r = strategyPlan(items, base);
     const times = [...r.assignments.values()].sort();
-    expect(times).toHaveLength(2);
+    expect(times).toEqual(["2026-11-02T08:00:00.000Z", "2026-11-03T08:00:00.000Z"]);
     expect(r.shortages.length).toBeGreaterThan(0);
     expect(r.shortages[0]!.reason).toMatch(/same source/);
   });
