@@ -52,43 +52,74 @@ export interface Recommendation {
   weights: Record<string, number>;
   changes: { group: string; from: number; to: number; why: string }[];
   skipped: { group: string; why: string }[];
+  /** Set when no change can be recommended at all; weights are then exactly the current ones. */
+  blocked?: string;
 }
 
 /**
- * Suggests new bucket weights. Only groups with >= minSample samples move; each move is bounded by
- * ±maxStep (relative) and every bucket keeps at least diversityFloor share after normalisation.
+ * Suggests new bucket weights. Works on shares of the total weight, which stays constant:
+ * - only groups with >= minSample samples move; unsampled groups keep their exact weight;
+ * - every moved group's FINAL share stays within ±maxStep (relative) of its current share;
+ * - every moved group's FINAL share is >= diversityFloor;
+ * - with no evidence, or infeasible settings, current weights are returned unchanged.
  */
 export function recommendWeights(
   current: Record<string, number>,
   stats: GroupStat[],
   opts: { minSample: number; maxStep: number; diversityFloor: number },
 ): Recommendation {
-  const groups = new Set([...Object.keys(current), ...stats.map((s) => s.group)]);
+  const unchanged = (blocked: string, skipped: Recommendation["skipped"]): Recommendation => ({ weights: { ...current }, changes: [], skipped, blocked });
   const eligible = stats.filter((s) => s.n >= opts.minSample && s.median != null);
-  const skipped = stats.filter((s) => !(s.n >= opts.minSample && s.median != null)).map((s) => ({ group: s.group, why: `Only ${s.n} sample(s); needs ${opts.minSample}` }));
+  const skipped = stats.filter((s) => !eligible.includes(s)).map((s) => ({ group: s.group, why: `Only ${s.n} sample(s); needs ${opts.minSample}` }));
+  if (!(opts.maxStep > 0 && opts.maxStep < 1) || !(opts.diversityFloor >= 0 && opts.diversityFloor < 1)) return unchanged("Invalid step or floor setting", skipped);
   const baseline = median(eligible.map((s) => s.median!));
-  const raw: Record<string, number> = {};
-  const changes: Recommendation["changes"] = [];
+  if (eligible.length < 2 || !baseline || baseline <= 0) return unchanged(`Needs at least two buckets with ${opts.minSample}+ comparable samples`, skipped);
+
+  const groups = [...new Set([...Object.keys(current), ...stats.map((s) => s.group)])];
+  const wOf = (g: string) => Math.max(0, current[g] ?? 1);
+  const total = groups.reduce((sum, g) => sum + wOf(g), 0);
+  if (total <= 0) return unchanged("All current weights are zero", skipped);
+  const share = Object.fromEntries(groups.map((g) => [g, wOf(g) / total])) as Record<string, number>;
+  const moving = new Set(eligible.map((e) => e.group));
+  const lo: Record<string, number> = {};
+  const hi: Record<string, number> = {};
+  const target: Record<string, number> = {};
   for (const g of groups) {
-    const from = current[g] ?? 1;
-    const s = eligible.find((e) => e.group === g);
-    let to = from;
-    if (s && baseline && baseline > 0 && eligible.length >= 2) {
-      const ratio = s.median! / baseline;
-      const step = Math.max(-opts.maxStep, Math.min(opts.maxStep, ratio - 1));
-      to = from * (1 + step);
-      if (Math.abs(to - from) > 1e-9) changes.push({ group: g, from, to, why: `Median ${s.median!.toFixed(0)} vs typical ${baseline.toFixed(0)} over ${s.n} posts (change capped at ±${Math.round(opts.maxStep * 100)}%)` });
+    const s = share[g]!;
+    if (!moving.has(g)) {
+      lo[g] = hi[g] = target[g] = s;
+      continue;
     }
-    raw[g] = to;
+    lo[g] = Math.max(opts.diversityFloor, s * (1 - opts.maxStep));
+    hi[g] = Math.min(1, s * (1 + opts.maxStep));
+    if (lo[g]! > hi[g]! + 1e-12) return unchanged(`${g} is below the diversity floor and cannot reach it within one capped step — raise its weight in Strategy first`, skipped);
+    const st = eligible.find((e) => e.group === g)!;
+    target[g] = s * (1 + Math.max(-opts.maxStep, Math.min(opts.maxStep, st.median! / baseline - 1)));
   }
-  // Diversity floor on shares, then rescale so the average weight stays 1.
-  const n = groups.size || 1;
-  const sum = Object.values(raw).reduce((a, b) => a + b, 0) || 1;
-  const weights: Record<string, number> = {};
-  for (const g of groups) weights[g] = Math.max(raw[g]! / sum, opts.diversityFloor);
-  const s2 = Object.values(weights).reduce((a, b) => a + b, 0);
-  for (const g of groups) weights[g] = +((weights[g]! / s2) * n).toFixed(3);
-  for (const c of changes) c.to = weights[c.group]!;
+  const sumLo = groups.reduce((a, g) => a + lo[g]!, 0);
+  const sumHi = groups.reduce((a, g) => a + hi[g]!, 0);
+  if (sumLo > 1 + 1e-9 || sumHi < 1 - 1e-9) return unchanged("Floor and step settings cannot be satisfied together for these buckets", skipped);
+  // Shift moving groups by λ·share (clamped to their bounds) so the shares sum to 1 again.
+  const at = (l: number) => Object.fromEntries(groups.map((g) => [g, moving.has(g) ? Math.min(hi[g]!, Math.max(lo[g]!, target[g]! + l * share[g]!)) : share[g]!])) as Record<string, number>;
+  const sumAt = (l: number) => Object.values(at(l)).reduce((a, b) => a + b, 0);
+  let a = -10, b = 10;
+  for (let i = 0; i < 200; i++) {
+    const m = (a + b) / 2;
+    if (sumAt(m) < 1) a = m;
+    else b = m;
+  }
+  const final = at((a + b) / 2);
+  const weights: Record<string, number> = { ...current };
+  const changes: Recommendation["changes"] = [];
+  for (const g of moving) {
+    const to = final[g]! * total;
+    const from = wOf(g);
+    weights[g] = to;
+    if (Math.abs(to - from) > 1e-9) {
+      const st = eligible.find((e) => e.group === g)!;
+      changes.push({ group: g, from, to, why: `Median ${st.median!.toFixed(0)} vs typical ${baseline.toFixed(0)} over ${st.n} posts (capped at ±${Math.round(opts.maxStep * 100)}%, floor ${Math.round(opts.diversityFloor * 100)}%)` });
+    }
+  }
   return { weights, changes, skipped };
 }
 
