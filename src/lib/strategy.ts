@@ -59,12 +59,12 @@ export const BRAND_DEFAULTS = [
   },
 ] as const;
 
-/** Session/source group: explicit value, else parent folder + filename stem without trailing numbers. */
+/** Session/source group: explicit owner value, else parent folder + file stem minus copy/edit/version markers. */
 export function sourceGroupOf(a: { source_group?: string | null; rel_path: string }): string {
   if (a.source_group?.trim()) return a.source_group.trim().toLowerCase();
   const parts = a.rel_path.split("/");
   const file = parts.pop() ?? "";
-  const stem = file.replace(/\.[^.]+$/, "").toLowerCase().replace(/[\s_-]*(\d+|copy|final|v\d+)$/g, "").replace(/[\s_-]+\d+$/, "");
+  const stem = file.replace(/\.[^.]+$/, "").toLowerCase().replace(/(\s*\(\d+\)|[\s_-]*(copy|kopi|final|edit|v\d+))+$/g, "");
   return `${parts.slice(-1)[0] ?? ""}/${stem}`;
 }
 
