@@ -27,12 +27,15 @@ import { activatePublishing } from "@/lib/app.functions";
 import { validateDailyTimes } from "@/lib/publishing-rules";
 
 export const Route = createFileRoute("/_authenticated/calendar")({
+  validateSearch: (s: Record<string, unknown>): { plan?: "new" } => (s.plan === "new" ? { plan: "new" } : {}),
   head: () => ({ meta: [{ title: "Calendar — Skyline Publisher" }, { name: "description", content: "Plan and review the publishing schedule." }, { property: "og:title", content: "Calendar — Skyline Publisher" }, { property: "og:description", content: "Plan and review the publishing schedule." }] }),
   component: CalendarPage,
 });
 
 function CalendarPage() {
   const qc = useQueryClient();
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
   const { data: assets = [] } = useQuery(assetsQuery);
   const { data: pubs = [] } = useQuery(publicationsQuery);
   const { data: settings } = useQuery(settingsQuery);
@@ -48,6 +51,7 @@ function CalendarPage() {
   const [mixing, setMixing] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [month, setMonth] = useState(osloDateKey(new Date()).slice(0, 7));
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!settings) return;
@@ -55,7 +59,16 @@ function CalendarPage() {
     setPostTimes((settings.post_times?.length ? settings.post_times : [settings.post_time]).map((t) => t.slice(0, 5)));
     setReelTime(settings.reel_time.slice(0, 5));
     setMixing(settings.topic_mixing);
+    setReady(true);
   }, [settings]);
+
+  // Coming from Library's "Schedule new items": open the preview (nothing is saved until confirmed).
+  useEffect(() => {
+    if (search.plan !== "new" || !ready || !assets.length) return;
+    navigate({ search: {}, replace: true });
+    void apply("append");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.plan, ready, assets.length]);
 
   const effectivePosts = (settings?.post_times ?? []).map((t) => t.slice(0, 5));
   const effectiveReel = settings?.reel_time?.slice(0, 5) ?? "—";
