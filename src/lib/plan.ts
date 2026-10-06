@@ -5,7 +5,7 @@ import { sourceGroupOf, type BrandStrategy } from "./strategy";
 
 /** An item is locked once any platform has gone past "waiting": its slot and records are preserved. */
 export function lockedAssetIds(pubs: Publication[]): Set<string> {
-  return new Set(pubs.filter((p) => !["pending", "retry", "skipped"].includes(p.status)).map((p) => p.asset_id));
+  return new Set(pubs.filter((p) => !(REPLANNABLE as readonly string[]).includes(p.status)).map((p) => p.asset_id));
 }
 
 export interface PlanInput {
