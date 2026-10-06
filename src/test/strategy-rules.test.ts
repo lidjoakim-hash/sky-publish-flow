@@ -52,11 +52,13 @@ describe("strategy planner", () => {
       { at: "2026-12-01T08:00:00.000Z", kind: "post" as const, bucket: "proof", sourceGroup: "h1", hook: null },
       { at: "2026-12-02T08:00:00.000Z", kind: "post" as const, bucket: "proof", sourceGroup: "h2", hook: null },
     ];
-    const r = strategyPlan([item("l", { bucket: "local" }), item("p", { bucket: "proof" })], { ...base, postTimes: ["09:00"], history });
-    // With only prior history counted, the first slot follows the given order/weights (proof not penalised).
-    expect([...r.assignments].sort((x, y) => x[1].localeCompare(y[1]))[0]![0]).toBe("l");
-    const r2 = strategyPlan([item("n", { sourceGroup: "h1" })], { ...base, startDate: "2026-11-30", postTimes: ["09:00"], notBefore: new Date("2026-11-29T00:00:00Z"), history });
-    expect(r2.assignments.get("n")).not.toBe("2026-11-30T08:00:00.000Z");
+    const r = strategyPlan([item("p", { bucket: "proof" }), item("l", { bucket: "local" })], { ...base, postTimes: ["09:00"], history });
+    // Later-dated "proof" items must not count against proof now; counting them would pick "l" first.
+    expect([...r.assignments].sort((x, y) => x[1].localeCompare(y[1]))[0]![0]).toBe("p");
+    const r2 = strategyPlan([item("n", { sourceGroup: "h1" })], { ...base, startDate: "2026-11-30", postTimes: ["13:00"], notBefore: new Date("2026-11-29T00:00:00Z"), history });
+    // 30 Nov 13:00 is adjacent (19 h) to the later same-source item on 1 Dec 09:00, so it is skipped.
+    expect(r2.assignments.get("n")).not.toBe("2026-11-30T12:00:00.000Z");
+    expect(r2.shortages.length + (r2.assignments.size ? 0 : 1)).toBeGreaterThan(0);
   });
 
   it("does not repeat the same hook consecutively", () => {
