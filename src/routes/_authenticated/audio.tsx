@@ -136,6 +136,7 @@ function AudioPage() {
   }
 
   const needing = reels.filter((r) => !reelAudioOk(r.audio_state));
+  const withSound = reels.filter((r) => r.audio_state === "existing");
   const toggle = (id: string) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   return (
@@ -185,14 +186,15 @@ function AudioPage() {
               <Select value={mode} onValueChange={(v) => setMode(v as "replace" | "mix")}>
                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="replace">Use music only</SelectItem>
-                  <SelectItem value="mix">Mix with existing sound</SelectItem>
+                  <SelectItem value="replace">Remove existing sound, add music</SelectItem>
+                  <SelectItem value="mix">Keep existing sound, mix in music</SelectItem>
                 </SelectContent>
               </Select>
               <div>
                 <div className="mb-2 flex justify-between"><span>Music volume</span><span>{volume}%</span></div>
                 <Slider value={[volume]} min={10} max={150} step={5} onValueChange={(v) => setVolume(v[0])} />
               </div>
+              <p className="text-xs text-muted-foreground">{mode === "replace" ? "The Reel's own sound is removed completely in the new copy; only the music plays. Your original file is kept unchanged." : "The Reel's own sound stays and the music plays underneath."}</p>
               <p className="text-xs text-muted-foreground">Music is looped or trimmed to each Reel, with short fades. The result is a new MP4 (H.264 + AAC) that is checked for sound level, length and size.</p>
               <Button variant="teal" className="w-full" onClick={queue} disabled={!sel.size}>Render {sel.size || ""} Reels</Button>
             </div>
@@ -203,7 +205,7 @@ function AudioPage() {
             </p>
           </Panel>
         </div>
-        <Panel className="lg:col-span-2" title={`Reels (${reels.length})`} action={needing.length > 0 && <Button size="sm" variant="ghost" onClick={() => setSel(new Set(needing.map((r) => r.id)))}>Select all needing audio</Button>}>
+        <Panel className="lg:col-span-2" title={`Reels (${reels.length})`} action={<div className="flex flex-wrap gap-1">{needing.length > 0 && <Button size="sm" variant="ghost" onClick={() => setSel(new Set(needing.map((r) => r.id)))}>Select all needing audio</Button>}{withSound.length > 0 && <Button size="sm" variant="ghost" onClick={() => { setSel(new Set(withSound.map((r) => r.id))); setMode("replace"); }}>Select all with existing sound</Button>}</div>}>
           {!reels.length ? <Empty>No Reels imported yet.</Empty> : (
             <div className="divide-y">
               {reels.map((r) => {
