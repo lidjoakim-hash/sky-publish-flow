@@ -21,7 +21,6 @@ export const Route = createFileRoute("/")({
 
 function SignIn() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"in" | "up">("in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
