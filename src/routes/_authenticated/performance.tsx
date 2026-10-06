@@ -31,6 +31,7 @@ function PerformancePage() {
   const { data: assets = [] } = useQuery(assetsQuery);
   const { data: metrics = [] } = useQuery(metricsQuery);
   const { data: conn } = useQuery(connectionQuery);
+  const { data: pubs = [] } = useQuery(publicationsQuery);
   const pull = useServerFn(fetchMetaInsights);
   const [platform, setPlatform] = useState("instagram");
   const [objective, setObjective] = useState("");
@@ -141,6 +142,25 @@ function PerformancePage() {
           {rec.skipped.length > 0 && <p className="mt-1 text-xs text-muted-foreground">Not enough data: {rec.skipped.map((s) => `${bucketLabel(s.group)} (${s.why.toLowerCase()})`).join("; ")}</p>}
           <p className="mt-1 text-xs text-muted-foreground">Medians limit the effect of one viral post. Changes are capped and every bucket keeps a minimum share. This is a nudge for your account, not a universal rule.</p>
         </div>
+      </Panel>
+
+      <Panel title="Best posting hours (your own results)" className="mt-4">
+        {(() => {
+          const pubAt = new Map(pubs.filter((p) => p.platform === platform && p.status === "published" && p.published_at).map((p) => [p.asset_id, p.published_at as string]));
+          const rows = filtered.filter((r) => pubAt.has(r.asset_id)).map((r) => ({ publishedAt: pubAt.get(r.asset_id)!, value: (r as unknown as Record<string, number | null>)[metric] }));
+          const h = hourStats(rows, opts.minSample);
+          const fmt = (n: number) => `${String(n).padStart(2, "0")}:00`;
+          if (!h.all.length) return <Empty>No published posts with {LABEL[metric].toLowerCase()} numbers yet. Advice appears after real results come in.</Empty>;
+          return (
+            <>
+              <table className="w-full text-sm">
+                <thead className="text-left text-xs text-muted-foreground"><tr><th className="py-1">Hour (Oslo)</th><th>Posts</th><th>Median</th></tr></thead>
+                <tbody>{h.all.map((s) => <tr key={s.hour} className="border-t"><td className="py-1.5">{fmt(s.hour)}</td><td>{s.n}</td><td>{s.n >= opts.minSample ? Math.round(s.median) : "too few"}</td></tr>)}</tbody>
+              </table>
+              <p className="mt-2 text-sm">{h.enough ? `Strongest so far: ${h.ranked.slice(0, 3).map((s) => fmt(s.hour)).join(", ")}. Change your times in the Calendar if you want — nothing changes automatically.` : `Needs at least ${opts.minSample} posts in two or more hours before suggesting anything.`}</p>
+            </>
+          );
+        })()}
       </Panel>
     </div>
   );
