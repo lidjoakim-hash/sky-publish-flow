@@ -18,8 +18,8 @@
 - Meta credentials are server secrets (META_PAGE_ACCESS_TOKEN, META_PAGE_ID, META_IG_USER_ID, optional META_GRAPH_VERSION), never stored in the database or browser.
 - The cron route /api/public/cron/publish uses authenticateCronRequest; the cron job is created only when the user first activates publishing.
 - Strategy rules (bucket vocabulary, keyword suggestions, source grouping) live in src/lib/strategy.ts; the strategy-aware planner is src/lib/planner.ts, wrapped by planWithStrategy in src/lib/plan.ts and covered by src/test/strategy-rules.test.ts — keeps rotation/cooldown/lock behaviour testable.
-- Calendar plans are previewed client-side and committed only via the commitSchedule server function, which re-checks brand, locks, past slots and collisions — the browser cannot bypass planning safeguards.
+- Calendar plans are previewed client-side; commitSchedule recomputes the plan from persisted data and refuses stale previews, then writes via the commit_schedule DB function (one transaction, row locks, lease/lock/brand/collision checks, all-or-nothing) — the browser cannot bypass planning safeguards.
 - Assets carry brand_slug; planning, organizing, ideas and metrics are scoped per brand, and activatePublishing only enqueues the brand whose Meta secrets exist (skyline) — prevents posting one brand to another's accounts.
 - metric_snapshots are separate from publications; clients may only write source manual/csv, meta_api rows come from the server — metrics can never alter publish status.
-- Weight advice (src/lib/feedback.ts) uses medians, a minimum sample, bounded steps and a diversity floor, and is applied only by explicit owner action logged in strategy_changes.
+- Weight advice (src/lib/feedback.ts) uses medians and a minimum sample, enforces step bounds and the diversity floor on the final shares, keeps unsampled weights exact and returns current weights untouched when evidence or settings are insufficient; and is applied only by explicit owner action logged in strategy_changes.
 - Idea briefs are template-based (src/lib/ideas.ts), stored in content_drafts, never overwrite assets.caption and are never scheduled.
