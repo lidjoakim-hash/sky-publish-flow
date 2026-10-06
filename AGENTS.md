@@ -10,6 +10,7 @@
 <!-- LOVABLE:END -->
 
 ## Architecture rules
+- Render progress is presentation-only, derived from persisted job progress; time estimates use observed worker updates and pause when stale — animation must never simulate completed work.
 - Pure rules (CSV parsing, caption matching, Oslo scheduling, ZIP safety, audio levels) live in src/lib/*.ts without I/O and are covered by src/test/core-rules.test.ts — keeps behaviour testable.
 - Import runs in the browser (src/lib/importer.ts): ZIPs are streamed entry-by-entry with fflate; never send archives to server functions — Workers have short limits and small memory.
 - Publishing is a per-(asset, platform) state machine in src/lib/publisher.server.ts, claimed via the claim_publications DB lease; intent is persisted before each Meta write and interrupted sends become "unknown" — prevents double posts.

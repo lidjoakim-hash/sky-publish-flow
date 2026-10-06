@@ -71,9 +71,7 @@ export const tracksQuery = queryOptions({
 export const jobsQuery = queryOptions({
   queryKey: ["render_jobs"],
   queryFn: async () => {
-    const { data, error } = await supabase.from("render_jobs").select("*").order("created_at", { ascending: false }).limit(300);
-    if (error) throw error;
-    return data;
+    return all<RenderJob>((f, t) => supabase.from("render_jobs").select("*").order("created_at", { ascending: false }).order("id").range(f, t));
   },
   refetchInterval: 5000,
 });
