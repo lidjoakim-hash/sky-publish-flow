@@ -13,6 +13,7 @@ const Body = z.object({
     .object({
       has_audio: z.boolean(),
       rms_db: z.number().nullable(),
+      loudness_lufs: z.number().nullable().optional(),
       duration_s: z.number(),
       width: z.number().int(),
       height: z.number().int(),

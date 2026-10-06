@@ -46,13 +46,17 @@ async function probe(file) {
   const v = j.streams.find((s) => s.codec_type === "video");
   const a = j.streams.find((s) => s.codec_type === "audio");
   let rms = null;
+  let lufs = null;
   if (a) {
     const { err } = await run("ffmpeg", ["-hide_banner", "-i", file, "-map", "0:a:0", "-af", "volumedetect", "-f", "null", "-"]);
     const m = /mean_volume:\s*(-?[\d.]+) dB/.exec(err);
     rms = m ? Number(m[1]) : null;
+    const e = await run("ffmpeg", ["-hide_banner", "-nostats", "-i", file, "-map", "0:a:0", "-af", "ebur128", "-f", "null", "-"]);
+    const all = [...e.err.matchAll(/I:\s*(-?[\d.]+) LUFS/g)];
+    lufs = all.length ? Number(all[all.length - 1][1]) : null;
   }
   return {
-    has_audio: !!a, rms_db: rms, duration_s: Number(j.format.duration),
+    has_audio: !!a, rms_db: rms, loudness_lufs: lufs, duration_s: Number(j.format.duration),
     width: v?.width ?? 0, height: v?.height ?? 0, size_bytes: (await stat(file)).size,
     video_codec: v?.codec_name ?? "none", audio_codec: a?.codec_name ?? null,
   };
@@ -75,13 +79,15 @@ async function handle(job) {
     const vol = Number(job.music_volume ?? 0.8);
     const musicChain = `[1:a]atrim=0:${d},asetpts=N/SR/TB,volume=${vol},afade=t=in:d=0.5,afade=t=out:st=${fadeOut}:d=1.5[m]`;
     const filter = job.mode === "mix" && info.has_audio
-      ? `${musicChain};[0:a][m]amix=inputs=2:duration=first:normalize=0[a]`
-      : `${musicChain};[m]anull[a]`;
+      ? `${musicChain};[0:a][m]amix=inputs=2:duration=first:normalize=0[pre]`
+      : `${musicChain};[m]anull[pre]`;
+    // Loudness normalisation after the music chain (fades kept): target -14 LUFS, single pass.
+    const filterWithLoudnorm = `${filter};[pre]loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[a]`;
     const out = join(dir, "out.mp4");
     let lastReport = 0;
     await run("ffmpeg", [
       "-y", "-hide_banner", "-i", src, "-stream_loop", "-1", "-i", music,
-      "-filter_complex", filter, "-map", "0:v:0", "-map", "[a]",
+      "-filter_complex", filterWithLoudnorm, "-map", "0:v:0", "-map", "[a]",
       "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p", "-profile:v", "high",
       "-r", "30", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
       "-t", String(d), "-movflags", "+faststart", out,
