@@ -1,7 +1,7 @@
 /** Strategy-aware slot planner. Pure: no I/O. Fills the same Oslo slots as assignSchedule, but
  * rotates buckets, avoids consecutive repeats of source/hook, honours a source cooldown and leaves a
  * slot empty (reported as a shortage) rather than filling it with a repeat. */
-import { addDays, jitteredSlot } from "./schedule";
+import { addDays, jitteredSlot, slotOccupied } from "./schedule";
 import { UNCLASSIFIED } from "./strategy";
 
 export interface PlanItem {
@@ -78,7 +78,7 @@ export function strategyPlan(items: PlanItem[], o: StrategyPlanOptions): Strateg
       if (!pool.length) continue;
       const ms = at.getTime();
       const iso = at.toISOString();
-      if (at <= o.notBefore || taken.has(iso)) continue;
+      if (at <= o.notBefore || taken.has(iso) || slotOccupied(takenMs, ms, o.jitterMinutes ?? 0)) continue;
       if (spacing && takenMs.some((x) => Math.abs(x - ms) < spacing)) continue;
       // Chronological neighbours of any kind (history may include later, already-dated items).
       const prev = placed.filter((h) => h.ms < ms).sort((a, b) => b.ms - a.ms)[0];

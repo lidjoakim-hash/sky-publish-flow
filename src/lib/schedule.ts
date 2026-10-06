@@ -98,6 +98,12 @@ export function slotJitterMinutes(baseIso: string, kind: string, max: number): n
   return n < max ? n - max : n - max + 1;
 }
 
+/** With jitter, a slot counts as taken if anything is already dated within 2×max minutes of it. */
+export function slotOccupied(takenMs: number[], ms: number, max: number): boolean {
+  if (max <= 0) return false;
+  return takenMs.some((x) => Math.abs(x - ms) < 2 * max * 60_000);
+}
+
 export function jitteredSlot(date: string, time: string, timeZone: string, kind: string, max = 0): Date {
   const base = zonedToUtc(date, time, timeZone);
   return new Date(base.getTime() + slotJitterMinutes(base.toISOString(), kind, max) * 60_000);
@@ -115,6 +121,7 @@ export function assignSchedule<T extends SchedulableItem>(items: T[], opts: Sche
   // Track slots assigned in this run too, so a post time equal to the Reel time (or a repeated
   // post time) never puts two items in the same instant.
   const taken = new Set(opts.taken);
+  const takenMs = [...taken].map((t) => new Date(t).getTime());
   for (const kind of ["post", "reel"] as const) {
     let list = items.filter((i) => i.kind === kind);
     if (opts.topicMixing) list = mixTopics(list);
@@ -126,8 +133,9 @@ export function assignSchedule<T extends SchedulableItem>(items: T[], opts: Sche
         const slot = jitteredSlot(addDays(opts.startDate, day), time, tz, kind, opts.jitterMinutes ?? 0);
         k++;
         const iso = slot.toISOString();
-        if (slot <= opts.notBefore || taken.has(iso)) continue;
+        if (slot <= opts.notBefore || taken.has(iso) || slotOccupied(takenMs, slot.getTime(), opts.jitterMinutes ?? 0)) continue;
         taken.add(iso);
+        takenMs.push(slot.getTime());
         result.set(item.id, iso);
         break;
       }
