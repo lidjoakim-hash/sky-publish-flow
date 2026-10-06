@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { assetsQuery, signedUrl, type Asset } from "@/lib/queries";
 import { formatOslo } from "@/lib/schedule";
 import { readiness } from "@/lib/readiness";
+import { metaIssues } from "@/lib/meta-format";
 
 export const Route = createFileRoute("/_authenticated/library")({
   head: () => ({ meta: [{ title: "Library — Skyline Publisher" }, { name: "description", content: "Review media, captions and readiness." }, { property: "og:title", content: "Library — Skyline Publisher" }, { property: "og:description", content: "Review media, captions and readiness." }] }),
@@ -117,6 +118,9 @@ function LibraryPage() {
                   {issues.map((i) => <Badge key={i} variant="warning">{i}</Badge>)}
                   {a.approved && <Badge variant="success">Approved</Badge>}
                 </div>
+                {metaIssues(a).filter((i) => i.level === "tip").map((i) => (
+                  <p key={i.text} className="mt-1 text-xs text-muted-foreground">Meta tip: {i.text}</p>
+                ))}
                 <div className="mt-2 text-xs text-muted-foreground">{a.scheduled_at ? formatOslo(a.scheduled_at) : "No date yet"}</div>
                 <div className="mt-3 flex gap-2 border-t pt-3">
                   <Button size="sm" variant="ghost" onClick={() => open(a)}><Eye /> Preview</Button>
