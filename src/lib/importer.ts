@@ -216,7 +216,8 @@ export async function runImport(source: { kind: "files"; files: File[] } | { kin
   // Existing state for resume + dedupe
   const { data: existing } = await supabase.from("assets").select("id, sha256, rel_path, batch_id, upload_state");
   const doneInBatch = new Set((existing ?? []).filter((a) => a.batch_id === opts.batchId && a.upload_state === "done").map((a) => a.rel_path));
-  const shaSeen = new Set((existing ?? []).filter((a) => opts.allowRepeat ? a.batch_id === opts.batchId : true).map((a) => a.sha256));
+  // Only finished uploads count as duplicates, so files cut off by a refresh are uploaded again.
+  const shaSeen = new Set((existing ?? []).filter((a) => a.upload_state === "done" && (opts.allowRepeat ? a.batch_id === opts.batchId : true)).map((a) => a.sha256));
   const coverByKey = new Map<string, string>();
   const reelIdByKey = new Map<string, string>();
   const orderIndex = new Map(plan.order.map((p, i) => [p, i]));
