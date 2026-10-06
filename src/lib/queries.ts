@@ -91,3 +91,43 @@ export async function signedUrl(path: string, seconds = 600) {
   const { data } = await supabase.storage.from("media").createSignedUrl(path, seconds);
   return data?.signedUrl ?? null;
 }
+
+export type Brand = Database["public"]["Tables"]["brands"]["Row"];
+export type Draft = Database["public"]["Tables"]["content_drafts"]["Row"];
+export type MetricSnapshot = Database["public"]["Tables"]["metric_snapshots"]["Row"];
+export type StrategyChange = Database["public"]["Tables"]["strategy_changes"]["Row"];
+
+export const brandsQuery = queryOptions({
+  queryKey: ["brands"],
+  queryFn: async (): Promise<Brand[]> => {
+    const { BRAND_DEFAULTS } = await import("./strategy");
+    const { data, error } = await supabase.from("brands").select("*").order("created_at");
+    if (error) throw error;
+    const missing = BRAND_DEFAULTS.filter((d) => !data.some((b) => b.slug === d.slug));
+    if (!missing.length) return data;
+    const { error: e2 } = await supabase.from("brands").upsert(missing.map((m) => ({ ...m })), { onConflict: "user_id,slug", ignoreDuplicates: true });
+    if (e2) throw e2;
+    const { data: again, error: e3 } = await supabase.from("brands").select("*").order("created_at");
+    if (e3) throw e3;
+    return again;
+  },
+});
+
+export const draftsQuery = queryOptions({
+  queryKey: ["drafts"],
+  queryFn: () => all<Draft>((f, t) => supabase.from("content_drafts").select("*").order("created_at", { ascending: false }).range(f, t)),
+});
+
+export const metricsQuery = queryOptions({
+  queryKey: ["metrics"],
+  queryFn: () => all<MetricSnapshot>((f, t) => supabase.from("metric_snapshots").select("*").order("captured_at", { ascending: false }).range(f, t)),
+});
+
+export const strategyChangesQuery = queryOptions({
+  queryKey: ["strategy_changes"],
+  queryFn: async () => {
+    const { data, error } = await supabase.from("strategy_changes").select("*").order("applied_at", { ascending: false }).limit(50);
+    if (error) throw error;
+    return data;
+  },
+});
