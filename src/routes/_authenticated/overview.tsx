@@ -113,7 +113,7 @@ function Overview() {
         <Stat label="Reels remaining" value={s.reelsLeft} />
         <Stat label="Reel audio ready" value={`${s.audioReady}/${s.reels}`} tone={s.audioReady === s.reels && s.reels ? "teal" : "warn"} />
         <Stat label="Next publication" value={s.next ? formatOslo(s.next.scheduled_at!) : "—"} hint={s.next?.file_name} />
-        <Stat label="Missed slots" value={s.missed} tone={s.missed ? "warn" : undefined} hint={s.missed ? "Move them in Calendar" : undefined} />
+        <Stat label="Missed slots" value={s.missed} tone={s.missed ? "warn" : undefined} hint={s.missed ? "Reschedule or skip them" : undefined} />
         <Stat label="Failures / review" value={s.failures} tone={s.failures ? "danger" : undefined} />
         <Stat label="Uploads unfinished" value={s.uploading} />
         <Stat label="Renders running" value={s.rendering} />
