@@ -721,6 +721,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      commit_schedule: {
+        Args: { _brand: string; _items: Json }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never

@@ -137,7 +137,7 @@ function PerformancePage() {
               <ul className="mt-1 list-disc pl-5">{rec.changes.map((c) => <li key={c.group}>{bucketLabel(c.group)}: weight {c.from.toFixed(2)} → {c.to.toFixed(2)}. {c.why}</li>)}</ul>
               <Button className="mt-2" size="sm" variant="teal" onClick={applyRec}>Apply these weights</Button>
             </>
-          ) : <p className="text-muted-foreground">No change suggested — needs at least two buckets with {opts.minSample}+ comparable samples each.</p>}
+          ) : <p className="text-muted-foreground">No change suggested — {rec.blocked ?? "the data does not support a change"}.</p>}
           {rec.skipped.length > 0 && <p className="mt-1 text-xs text-muted-foreground">Not enough data: {rec.skipped.map((s) => `${bucketLabel(s.group)} (${s.why.toLowerCase()})`).join("; ")}</p>}
           <p className="mt-1 text-xs text-muted-foreground">Medians limit the effect of one viral post. Changes are capped and every bucket keeps a minimum share. This is a nudge for your account, not a universal rule.</p>
         </div>

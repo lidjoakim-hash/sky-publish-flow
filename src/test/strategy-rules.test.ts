@@ -39,6 +39,28 @@ describe("strategy planner", () => {
     expect(r.assignments.get("n")).toBe("2026-11-02T17:00:00.000Z");
   });
 
+  it("interleaves posts and reels chronologically and blocks same-source neighbours across kinds", () => {
+    const items = [item("p1", { sourceGroup: "s" }), item("p2", { sourceGroup: "t" }), item("r1", { kind: "reel", sourceGroup: "s" }), item("r2", { kind: "reel", sourceGroup: "u" })];
+    const r = strategyPlan(items, { ...base, postTimes: ["18:00"], reelTime: "19:00" });
+    // Day 1: 18:00 post p1 (source s); 19:00 reel must not be r1 (same source, adjacent) → r2.
+    expect(r.assignments.get("p1")).toBe("2026-11-02T17:00:00.000Z");
+    expect(r.assignments.get("r2")).toBe("2026-11-02T18:00:00.000Z");
+  });
+
+  it("future history does not skew rotation but still counts as a neighbour", () => {
+    const history = [
+      { at: "2026-12-01T08:00:00.000Z", kind: "post" as const, bucket: "proof", sourceGroup: "h1", hook: null },
+      { at: "2026-12-02T08:00:00.000Z", kind: "post" as const, bucket: "proof", sourceGroup: "h2", hook: null },
+    ];
+    const r = strategyPlan([item("p", { bucket: "proof" }), item("l", { bucket: "local" })], { ...base, postTimes: ["09:00"], history });
+    // Later-dated "proof" items must not count against proof now; counting them would pick "l" first.
+    expect([...r.assignments].sort((x, y) => x[1].localeCompare(y[1]))[0]![0]).toBe("p");
+    const r2 = strategyPlan([item("n", { sourceGroup: "h1" })], { ...base, startDate: "2026-11-30", postTimes: ["13:00"], notBefore: new Date("2026-11-29T00:00:00Z"), history });
+    // 30 Nov 13:00 is adjacent (19 h) to the later same-source item on 1 Dec 09:00, so it is skipped.
+    expect(r2.assignments.get("n")).not.toBe("2026-11-30T12:00:00.000Z");
+    expect(r2.shortages.length + (r2.assignments.size ? 0 : 1)).toBeGreaterThan(0);
+  });
+
   it("does not repeat the same hook consecutively", () => {
     const items = [item("h1", { hook: "Fra oven" }), item("h2", { hook: "Fra oven" }), item("h3", { hook: "Annet" })];
     const r = strategyPlan(items, base);
@@ -85,11 +107,47 @@ describe("feedback", () => {
     expect(r.changes).toHaveLength(0);
     expect(r.skipped).toHaveLength(2);
   });
-  it("bounds changes and keeps a diversity floor", () => {
-    const r = recommendWeights({ a: 1, b: 1, c: 1 }, [{ group: "a", n: 6, median: 1_000_000, missing: 0 }, { group: "b", n: 6, median: 100, missing: 0 }, { group: "c", n: 6, median: 1, missing: 0 }], { minSample: 5, maxStep: 0.2, diversityFloor: 0.05 });
-    expect(r.weights.a!).toBeLessThanOrEqual(1.25);
-    expect(r.weights.c!).toBeGreaterThanOrEqual(0.7);
+  const O = { minSample: 5, maxStep: 0.2, diversityFloor: 0.05 };
+  const st = (group: string, median: number, n = 6) => ({ group, n, median, missing: 0 });
+  const shares = (w: Record<string, number>) => { const t = Object.values(w).reduce((x, y) => x + y, 0); return Object.fromEntries(Object.entries(w).map(([k, v]) => [k, v / t])); };
+
+  it("leaves weights exactly unchanged without eligible evidence", () => {
+    const cur = { a: 2.5, b: 0.3 };
+    const r = recommendWeights(cur, [st("a", 100, 2), st("b", 5, 2)], O);
+    expect(r.weights).toEqual(cur);
+    expect(r.changes).toHaveLength(0);
+    expect(r.blocked).toBeTruthy();
   });
+
+  it("keeps unsampled groups' weights exactly", () => {
+    const r = recommendWeights({ a: 1, b: 1, d: 0.7 }, [st("a", 1000), st("b", 10)], O);
+    expect(r.weights.d).toBe(0.7);
+    expect(r.changes.length).toBeGreaterThan(0);
+  });
+
+  it("final shares stay within the relative step and above the floor", () => {
+    const cur = { a: 1, b: 1, c: 1, d: 1 };
+    const r = recommendWeights(cur, [st("a", 1_000_000), st("b", 100), st("c", 1), st("d", 50)], O);
+    const before = shares(cur), after = shares(r.weights);
+    for (const g of Object.keys(cur)) {
+      expect(Math.abs(after[g]! / before[g]! - 1)).toBeLessThanOrEqual(0.2 + 1e-6);
+      expect(after[g]!).toBeGreaterThanOrEqual(0.05 - 1e-9);
+    }
+    expect(Object.values(after).reduce((x, y) => x + y, 0)).toBeCloseTo(1, 9);
+  });
+
+  it("refuses very skewed weights that cannot reach the floor in one step", () => {
+    const cur = { a: 50, b: 0.1, c: 1 };
+    const r = recommendWeights(cur, [st("a", 10), st("b", 1000), st("c", 10)], O);
+    expect(r.weights).toEqual(cur);
+    expect(r.blocked).toMatch(/floor/);
+  });
+
+  it("refuses infeasible floor/step settings", () => {
+    const cur = { a: 1, b: 1 };
+    expect(recommendWeights(cur, [st("a", 10), st("b", 20)], { ...O, diversityFloor: 0.7 }).weights).toEqual(cur);
+  });
+
   it("parses CSV blanks as missing", () => {
     expect(parseMetricsCsv("asset,platform\nx.jpg,Instagram,48,100,,3")[0]!.values).toMatchObject({ reach: 100, views: null, saves: 3, inquiries: null });
   });
