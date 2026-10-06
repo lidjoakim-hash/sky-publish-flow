@@ -9,6 +9,10 @@ import { alertsQuery, assetsQuery, connectionQuery, publicationsQuery, settingsQ
 import { formatOslo } from "@/lib/schedule";
 import { reelAudioOk } from "@/lib/audio";
 import { lockedAssetIds } from "@/lib/plan";
+import { readiness } from "@/lib/readiness";
+import { bucketLabel, sourceGroupOf } from "@/lib/strategy";
+import { metricsQuery } from "@/lib/queries";
+import { useActiveBrand } from "@/components/brand";
 
 export const Route = createFileRoute("/_authenticated/overview")({
   head: () => ({ meta: [{ title: "Overview — Skyline Publisher" }, { name: "description", content: "Remaining posts, next publication and setup tasks." }, { property: "og:title", content: "Overview — Skyline Publisher" }, { property: "og:description", content: "Remaining posts, next publication and setup tasks." }] }),
@@ -23,6 +27,23 @@ function Overview() {
   const { data: conn } = useQuery(connectionQuery);
   const { data: alerts = [] } = useQuery(alertsQuery);
   const { data: jobs = [] } = useQuery(jobsQuery);
+  const { data: metrics = [] } = useQuery(metricsQuery);
+  const { slug, brand } = useActiveBrand();
+  const st = useMemo(() => {
+    const now = Date.now();
+    const mine = assets.filter((a) => a.brand_slug === slug && !a.skipped);
+    const future = mine.filter((a) => a.scheduled_at && new Date(a.scheduled_at).getTime() > now).sort((a, b) => a.scheduled_at!.localeCompare(b.scheduled_at!));
+    const last = future[future.length - 1]?.scheduled_at;
+    const days = last ? Math.ceil((new Date(last).getTime() - now) / 86_400_000) : 0;
+    const ready = future.filter((a) => a.approved && readiness(a).every((r) => r.startsWith("Seasonal"))).length;
+    const blocked = future.filter((a) => readiness(a).some((r) => !r.startsWith("Seasonal"))).length;
+    const mix = new Map<string, number>();
+    for (const a of future.slice(0, 28)) mix.set(bucketLabel(a.bucket), (mix.get(bucketLabel(a.bucket)) ?? 0) + 1);
+    const unplanned = mine.filter((a) => !a.scheduled_at);
+    const sources = new Set(unplanned.map((a) => sourceGroupOf(a))).size;
+    const lastJob = jobs.map((j) => j.updated_at).sort().pop();
+    return { days, ready, blocked, mix, unplanned: unplanned.length, sources, unclassified: mine.filter((a) => !a.bucket).length, workerRecent: !!lastJob && now - new Date(lastJob).getTime() < 15 * 60_000, snaps: metrics.filter((m) => m.brand_slug === slug).length };
+  }, [assets, jobs, metrics, slug]);
 
   const s = useMemo(() => {
     const active = assets.filter((a) => !a.skipped);
@@ -75,6 +96,16 @@ function Overview() {
           ))}
         </div>
       )}
+      <Panel title={`Strategy readiness · ${brand?.name ?? slug}`} className="mb-4">
+        <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+          <div><div className="text-xs text-muted-foreground">Queue coverage</div><div className="font-display text-xl font-bold">{st.days} days</div></div>
+          <div><div className="text-xs text-muted-foreground">Approved & ready / blocked</div><div className="font-display text-xl font-bold"><span className="text-teal">{st.ready}</span> / <span className="text-warning-foreground">{st.blocked}</span></div></div>
+          <div><div className="text-xs text-muted-foreground">Unplanned items / distinct sources</div><div className="font-display text-xl font-bold">{st.unplanned} / {st.sources}</div></div>
+          <div><div className="text-xs text-muted-foreground">Unclassified</div><div className="font-display text-xl font-bold">{st.unclassified}</div></div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-1 text-xs">{st.mix.size ? [...st.mix].map(([b, n]) => <span key={b} className="rounded bg-muted px-2 py-0.5">{b}: {n}</span>) : <span className="text-muted-foreground">No upcoming items.</span>}<span className="text-muted-foreground">(next 28 items)</span></div>
+        <p className="mt-2 text-xs text-muted-foreground">Meta: {conn?.status === "connected" ? "connected" : "not connected"} · Render worker: {st.workerRecent ? "active recently" : "not seen in 15 min"} · Performance data: {st.snaps ? `${st.snaps} snapshots` : "none yet"}</p>
+      </Panel>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Posts remaining" value={s.postsLeft} />
         <Stat label="Reels remaining" value={s.reelsLeft} />
