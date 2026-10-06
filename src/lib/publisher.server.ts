@@ -35,6 +35,16 @@ export async function runPublisherTick(admin: Admin, owner: string, deadlineMs =
   for (const s of stuck ?? []) await alert(admin, s.user_id, "warning", "A post needs review: the outcome of a send is unknown.");
   report.reconciled = stuck?.length ?? 0;
 
+  // Slots older than the claim window become "missed" (never posted late), one alert per item.
+  const { data: missed, error: me } = await admin.rpc("mark_missed_publications");
+  if (me) throw me;
+  const seen = new Set<string>();
+  for (const m of missed ?? []) {
+    if (seen.has(m.asset_id)) continue;
+    seen.add(m.asset_id);
+    await alert(admin, m.user_id, "warning", missedAlertMessage(m.file_name, m.scheduled_at));
+  }
+
   const creds = readMetaCreds();
   if (!creds) {
     report.skippedNoCreds = true;
