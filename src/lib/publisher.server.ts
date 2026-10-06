@@ -5,6 +5,7 @@
  * "unknown" for manual reconciliation, never a blind retry.
  */
 import { graph, MetaError, readMetaCreds, ruploadFromUrl, type MetaCreds } from "./meta.server";
+import { missedAlertMessage } from "./publishing-rules";
 
 type Admin = Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"];
 interface Pub {
