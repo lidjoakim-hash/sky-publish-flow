@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Music2, Upload, RefreshCw, X, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { assetsQuery, jobsQuery, settingsQuery, signedUrl, tracksQuery, type Asset } from "@/lib/queries";
 import { AUDIO_MODES, AUDIO_MODE_LABEL, TRENDING_LIMITATION, effectiveAudioMode } from "@/lib/reel-audio";
 import { probeAudioInBrowser, reelAudioOk } from "@/lib/audio";
+import { RenderProgress } from "@/components/render-progress";
 
 export const Route = createFileRoute("/_authenticated/audio")({
   head: () => ({ meta: [{ title: "Audio Studio — Skyline Publisher" }, { name: "description", content: "Make sure every Reel has audible, licensed audio." }, { property: "og:title", content: "Audio Studio — Skyline Publisher" }, { property: "og:description", content: "Make sure every Reel has audible, licensed audio." }] }),
@@ -26,7 +27,7 @@ function AudioPage() {
   const qc = useQueryClient();
   const { data: assets = [] } = useQuery(assetsQuery);
   const { data: tracks = [] } = useQuery(tracksQuery);
-  const { data: jobs = [] } = useQuery(jobsQuery);
+  const { data: jobs = [], isError: jobsError } = useQuery(jobsQuery);
   const { data: settings } = useQuery(settingsQuery);
   async function setDefaultAudio(v: string) {
     const { data: u } = await supabase.auth.getUser();
@@ -43,6 +44,15 @@ function AudioPage() {
   const [volume, setVolume] = useState(80);
   const [license, setLicense] = useState("");
   const [checking, setChecking] = useState(false);
+  const [queueing, setQueueing] = useState(false);
+  const [renderIds, setRenderIds] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const saved: unknown = JSON.parse(sessionStorage.getItem("skyline-render-progress") ?? "[]");
+      if (Array.isArray(saved) && saved.every((id) => typeof id === "string")) setRenderIds(saved);
+    } catch { /* Progress remains available from the current queue. */ }
+  }, []);
+  const progressJobs = useMemo(() => renderIds.length ? jobs.filter((j) => renderIds.includes(j.id)) : jobs.filter((j) => j.mode !== "probe" && ["queued", "processing"].includes(j.status)), [jobs, renderIds]);
   const [compare, setCompare] = useState<{ a: Asset; orig: string | null; out: string | null } | null>(null);
   const [trackUrl, setTrackUrl] = useState<{ id: string; url: string | null } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -79,6 +89,7 @@ function AudioPage() {
   }
 
   async function queue() {
+    if (queueing) return;
     const ids = [...sel];
     if (!ids.length) return toast("Select Reels first.");
     if (!tracks.length) return toast.error("Upload a licensed track first.");
@@ -88,12 +99,19 @@ function AudioPage() {
       mode,
       music_volume: volume / 100,
     }));
-    const { error } = await supabase.from("render_jobs").insert(rows);
+    setQueueing(true);
+    try {
+    const { data, error } = await supabase.from("render_jobs").insert(rows).select("id");
     if (error) return toast.error(error.message);
+    const queuedIds = (data ?? []).map((j) => j.id);
+    setRenderIds(queuedIds);
+    try { sessionStorage.setItem("skyline-render-progress", JSON.stringify(queuedIds)); } catch { /* Optional persistence. */ }
     await supabase.from("assets").update({ audio_state: "processing" }).in("id", ids);
     setSel(new Set());
     toast.success(`${ids.length} renders queued. They start when your render worker is running.`);
-    qc.invalidateQueries();
+    await qc.invalidateQueries();
+    } catch { toast.error("Could not refresh the render queue. Check the Reels list before trying again."); }
+    finally { setQueueing(false); }
   }
 
   async function recheck() {
@@ -196,8 +214,9 @@ function AudioPage() {
               </div>
               <p className="text-xs text-muted-foreground">{mode === "replace" ? "The Reel's own sound is removed completely in the new copy; only the music plays. Your original file is kept unchanged." : "The Reel's own sound stays and the music plays underneath."}</p>
               <p className="text-xs text-muted-foreground">Music is looped or trimmed to each Reel, with short fades. The result is a new MP4 (H.264 + AAC) that is checked for sound level, length and size.</p>
-              <Button variant="teal" className="w-full" onClick={queue} disabled={!sel.size}>Render {sel.size || ""} Reels</Button>
+               <Button variant="teal" className="w-full" onClick={queue} disabled={!sel.size || queueing}>{queueing ? "Queueing Reels…" : `Render ${sel.size || ""} Reels`}</Button>
             </div>
+             {(queueing || progressJobs.length > 0) && <RenderProgress jobs={progressJobs} loading={queueing} error={jobsError} />}
           </Panel>
           <Panel title="Render worker">
             <p className="text-sm text-muted-foreground">

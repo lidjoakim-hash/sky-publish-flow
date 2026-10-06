@@ -136,3 +136,23 @@
 @utility bg-hero {
   background-image: var(--gradient-hero);
 }
+
+@keyframes render-panel-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes render-orbit {
+  to { transform: rotate(360deg); }
+}
+@keyframes render-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+.render-progress-panel { animation: render-panel-enter 450ms ease-out; }
+.render-completion-ring { transition: stroke-dashoffset 1s cubic-bezier(0.22, 1, 0.36, 1); }
+.render-orbit { animation: render-orbit 16s linear infinite; }
+.render-bar-shimmer { animation: render-shimmer 2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .render-progress-panel, .render-orbit, .render-bar-shimmer { animation: none; }
+  .render-completion-ring { transition: none; }
+}
