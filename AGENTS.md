@@ -23,3 +23,7 @@
 - metric_snapshots are separate from publications; clients may only write source manual/csv, meta_api rows come from the server — metrics can never alter publish status.
 - Weight advice (src/lib/feedback.ts) uses medians and a minimum sample, enforces step bounds and the diversity floor on the final shares, keeps unsampled weights exact and returns current weights untouched when evidence or settings are insufficient; and is applied only by explicit owner action logged in strategy_changes.
 - Idea briefs are template-based (src/lib/ideas.ts), stored in content_drafts, never overwrite assets.caption and are never scheduled.
+
+- Publication rows are created by the assets_sync_publications DB trigger when a Skyline item is dated (idempotent; reschedule resets only pending/retry/skipped/missed rows); activation only checks approved items — publishing follows the schedule without a second enqueue step.
+- Unsent slots older than the 3-hour claim window are marked "missed" by mark_missed_publications each tick, with one alert per item, and are never posted late; the owner reschedules or skips — prevents silent loss and backlog bursts.
+- Settings post_times are validated by a DB trigger (HH:MM, strictly ascending, none equal to reel_time), mirrored in src/lib/publishing-rules.ts for UI errors — the database is the final guard.

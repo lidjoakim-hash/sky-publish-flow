@@ -23,6 +23,7 @@ import { BrandSwitcher, useActiveBrand } from "@/components/brand";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { readiness } from "@/lib/readiness";
 import { activatePublishing } from "@/lib/app.functions";
+import { validateDailyTimes } from "@/lib/publishing-rules";
 
 export const Route = createFileRoute("/_authenticated/calendar")({
   head: () => ({ meta: [{ title: "Calendar — Skyline Publisher" }, { name: "description", content: "Plan and review the publishing schedule." }, { property: "og:title", content: "Calendar — Skyline Publisher" }, { property: "og:description", content: "Plan and review the publishing schedule." }] }),
@@ -55,6 +56,8 @@ function CalendarPage() {
     setMixing(settings.topic_mixing);
   }, [settings]);
 
+  const effectivePosts = (settings?.post_times ?? []).map((t) => t.slice(0, 5));
+  const effectiveReel = settings?.reel_time?.slice(0, 5) ?? "—";
   const scheduled = useMemo(() => assets.filter((a) => a.scheduled_at && !a.skipped && a.brand_slug === slug).sort((a, b) => a.scheduled_at!.localeCompare(b.scheduled_at!)), [assets]);
   const pubBy = useMemo(() => {
     const m = new Map<string, Record<string, string>>();
@@ -67,14 +70,19 @@ function CalendarPage() {
   const unapprovedReady = scheduled.filter((a) => !a.approved && readiness(a).every((r) => r.startsWith("Seasonal")));
   const notReady = scheduled.filter((a) => readiness(a).some((r) => !r.startsWith("Seasonal")));
 
-  async function saveSettings() {
-    if (!settings) return;
-    await supabase.from("settings").update({ start_date: start, post_times: postTimes, post_time: postTimes[0] ?? "18:00", reel_time: reelTime, topic_mixing: mixing, updated_at: new Date().toISOString() }).eq("user_id", settings.user_id);
+  async function saveSettings(): Promise<boolean> {
+    if (!settings) return false;
+    const bad = validateDailyTimes(postTimes, reelTime);
+    if (bad) { toast.error(bad); return false; }
+    const { error } = await supabase.from("settings").update({ start_date: start, post_times: postTimes, post_time: postTimes[0] ?? "18:00", reel_time: reelTime, topic_mixing: mixing, updated_at: new Date().toISOString() }).eq("user_id", settings.user_id);
+    if (error) { toast.error(`Times not saved: ${error.message}`); return false; }
+    qc.invalidateQueries({ queryKey: ["settings"] });
+    return true;
   }
 
   async function apply(mode: "append" | "reschedule" | "missed") {
     if (start <= osloDateKey(new Date()) && mode !== "missed") return toast.error("Choose a future start date.");
-    await saveSettings();
+    if (!(await saveSettings())) return;
     const res = planWithStrategy({ assets, pubs, startDate: mode === "missed" ? tomorrow : start, postTimes, reelTime, timeZone: settings?.timezone ?? "Europe/Oslo", topicMixing: mixing, mode, brand: slug, strategy });
     if (!res.assignments.size && !res.held.length) return toast("Nothing to schedule.");
     setPreview({ ...res, mode, startDate: start });
@@ -138,7 +146,7 @@ function CalendarPage() {
     <div className="mx-auto max-w-6xl">
       <PageHeader
         title="Calendar"
-        subtitle="Step 3–4 · Assign dates, review once, then activate. Times are Oslo time and follow summer/winter time."
+        subtitle={`Every day: image posts at ${effectivePosts.join(", ") || "—"} · Reel at ${effectiveReel} (${settings?.timezone ?? "Europe/Oslo"}, follows summer/winter time). Assign dates, review once, then activate.`}
         actions={<>
           <BrandSwitcher />
           {settings?.publishing_active ? (

@@ -13,6 +13,7 @@ import { readiness } from "@/lib/readiness";
 import { bucketLabel, sourceGroupOf } from "@/lib/strategy";
 import { metricsQuery } from "@/lib/queries";
 import { useActiveBrand } from "@/components/brand";
+import { MissedPanel } from "@/components/missed";
 
 export const Route = createFileRoute("/_authenticated/overview")({
   head: () => ({ meta: [{ title: "Overview — Skyline Publisher" }, { name: "description", content: "Remaining posts, next publication and setup tasks." }, { property: "og:title", content: "Overview — Skyline Publisher" }, { property: "og:description", content: "Remaining posts, next publication and setup tasks." }] }),
@@ -96,6 +97,7 @@ function Overview() {
           ))}
         </div>
       )}
+      <MissedPanel assets={assets} pubs={pubs} />
       <Panel title={`Strategy readiness · ${brand?.name ?? slug}`} className="mb-4">
         <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
           <div><div className="text-xs text-muted-foreground">Queue coverage</div><div className="font-display text-xl font-bold">{st.days} days</div></div>
@@ -111,7 +113,7 @@ function Overview() {
         <Stat label="Reels remaining" value={s.reelsLeft} />
         <Stat label="Reel audio ready" value={`${s.audioReady}/${s.reels}`} tone={s.audioReady === s.reels && s.reels ? "teal" : "warn"} />
         <Stat label="Next publication" value={s.next ? formatOslo(s.next.scheduled_at!) : "—"} hint={s.next?.file_name} />
-        <Stat label="Missed slots" value={s.missed} tone={s.missed ? "warn" : undefined} hint={s.missed ? "Move them in Calendar" : undefined} />
+        <Stat label="Missed slots" value={s.missed} tone={s.missed ? "warn" : undefined} hint={s.missed ? "Reschedule or skip them" : undefined} />
         <Stat label="Failures / review" value={s.failures} tone={s.failures ? "danger" : undefined} />
         <Stat label="Uploads unfinished" value={s.uploading} />
         <Stat label="Renders running" value={s.rendering} />

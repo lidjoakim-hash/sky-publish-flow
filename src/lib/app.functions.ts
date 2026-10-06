@@ -53,11 +53,15 @@ export const checkMetaConnection = createServerFn({ method: "POST" })
     }
   });
 
-/** Activates publishing after verifying readiness; creates per-platform publication rows. */
+/**
+ * Activates publishing. Publication rows are created by the assets trigger when items are dated
+ * (Skyline only). Only APPROVED items are checked for readiness; unapproved items are never claimed.
+ */
 export const activatePublishing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    const { activationBlockers } = await import("./publishing-rules");
     const { data: conn } = await supabase.from("meta_connection").select("status").maybeSingle();
     if (conn?.status !== "connected") return { ok: false, message: "Connect and check your Meta accounts first." };
     const { data: assets, error } = await supabase
@@ -67,20 +71,38 @@ export const activatePublishing = createServerFn({ method: "POST" })
       .eq("brand_slug", "skyline") // Meta secrets belong to Skyline; other brands are never sent with them.
       .not("scheduled_at", "is", null);
     if (error) throw error;
-    const blockers = (assets ?? []).filter(
-      (a) => !a.approved || a.upload_state !== "done" || !a.caption || (a.kind === "reel" && !reelAudioOk(a.audio_state)),
-    );
-    if (blockers.length) return { ok: false, message: `${blockers.length} scheduled items are not ready (approval, upload, caption or audio).` };
+    const blockers = activationBlockers(assets ?? []);
+    if (blockers.length) return { ok: false, message: `${blockers.length} approved items are not ready (upload, caption or Reel audio). Fix or unapprove them.` };
+    const approved = (assets ?? []).filter((a) => a.approved).length;
+    const { error: se } = await supabase.from("settings").upsert({ user_id: userId, publishing_active: true, updated_at: new Date().toISOString() });
+    if (se) throw se;
+    return { ok: true, message: `Publishing is active. ${approved} approved items will be posted; unapproved items wait until you approve them.` };
+  });
+
+/** Owner action on a missed slot: put it back into the planner, or skip it. Never posts late. */
+export const resolveMissed = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { assetId: string; action: "reschedule" | "skip" }) => {
+    if (!d || typeof d.assetId !== "string" || !["reschedule", "skip"].includes(d.action)) throw new Error("Invalid request");
+    return d;
+  })
+  .handler(async ({ context, data }) => {
+    const { data: asset } = await context.supabase.from("assets").select("id").eq("id", data.assetId).maybeSingle();
+    if (!asset) throw new Error("Not found");
     const { supabaseAdmin: admin } = await import("@/integrations/supabase/client.server");
-    const rows = (assets ?? []).flatMap((a) =>
-      (["instagram", "facebook"] as const).map((platform) => ({ user_id: userId, asset_id: a.id, platform })),
-    );
-    for (let i = 0; i < rows.length; i += 500) {
-      const { error: e } = await admin.from("publications").upsert(rows.slice(i, i + 500), { onConflict: "asset_id,platform", ignoreDuplicates: true });
-      if (e) throw e;
-    }
-    await supabase.from("settings").upsert({ user_id: userId, publishing_active: true, updated_at: new Date().toISOString() });
-    return { ok: true, message: `Publishing is active for ${assets?.length ?? 0} items.` };
+    const { data: rows, error } = await admin
+      .from("publications")
+      .update({ status: data.action === "reschedule" ? "pending" : "skipped", last_error: null, updated_at: new Date().toISOString() })
+      .eq("asset_id", data.assetId)
+      .eq("user_id", context.userId)
+      .eq("status", "missed")
+      .select("id");
+    if (error) throw error;
+    if (!rows?.length) return { ok: false, message: "Nothing to change — this item is no longer missed." };
+    const patch = data.action === "reschedule" ? { scheduled_at: null, approved: false } : { skipped: true };
+    const { error: ae } = await context.supabase.from("assets").update(patch).eq("id", data.assetId);
+    if (ae) throw ae;
+    return { ok: true, message: data.action === "reschedule" ? "Back in the planner. Use “Date new items” in Calendar." : "Skipped. The original file is kept." };
   });
 
 /** Marks an "unknown" publication after the user checked the account manually. */

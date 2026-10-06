@@ -9,6 +9,7 @@ import { Empty, PageHeader, PubBadge } from "@/components/app-ui";
 import { assetsQuery, publicationsQuery, type Publication } from "@/lib/queries";
 import { formatOslo } from "@/lib/schedule";
 import { resolvePublication } from "@/lib/app.functions";
+import { MissedPanel } from "@/components/missed";
 
 export const Route = createFileRoute("/_authenticated/results")({
   head: () => ({ meta: [{ title: "Publishing results — Skyline Publisher" }, { name: "description", content: "Instagram and Facebook results per item." }, { property: "og:title", content: "Publishing results — Skyline Publisher" }, { property: "og:description", content: "Instagram and Facebook results per item." }] }),
@@ -37,6 +38,7 @@ function ResultsPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader title="Publishing results" subtitle="Instagram and Facebook are tracked separately. “Published” is shown only after Meta confirms it." />
+      <MissedPanel assets={assets} pubs={pubs} />
       {!rows.length ? <Empty>Nothing queued yet. Items appear here after you activate publishing.</Empty> : (
         <div className="space-y-3">
           {rows.map(({ a, pubs }) => (

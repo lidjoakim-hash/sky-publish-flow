@@ -725,6 +725,15 @@ export type Database = {
         Args: { _brand: string; _items: Json }
         Returns: number
       }
+      mark_missed_publications: {
+        Args: never
+        Returns: {
+          asset_id: string
+          file_name: string
+          scheduled_at: string
+          user_id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
