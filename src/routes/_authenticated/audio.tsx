@@ -34,6 +34,7 @@ function AudioPage() {
   const [license, setLicense] = useState("");
   const [checking, setChecking] = useState(false);
   const [compare, setCompare] = useState<{ a: Asset; orig: string | null; out: string | null } | null>(null);
+  const [trackUrl, setTrackUrl] = useState<{ id: string; url: string | null } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const jobByAsset = useMemo(() => {
     const m = new Map<string, (typeof jobs)[number]>();
@@ -144,7 +145,14 @@ function AudioPage() {
             <input ref={fileRef} type="file" accept=".mp3,.wav,audio/mpeg,audio/wav" className="hidden" onChange={(e) => e.target.files?.[0] && uploadTrack(e.target.files[0])} />
             <ul className="mt-3 space-y-2 text-sm">
               {tracks.map((t) => (
-                <li key={t.id} className="flex items-center gap-2"><Music2 className="size-4 text-teal" /><span className="truncate">{t.name}</span><span className="ml-auto text-xs text-muted-foreground">{t.duration_s ? `${Math.round(Number(t.duration_s))}s` : ""}</span></li>
+                <li key={t.id} className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Music2 className="size-4 text-teal" /><span className="truncate">{t.name}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">{t.duration_s ? `${Math.round(Number(t.duration_s))}s` : ""}</span>
+                    <Button size="icon" variant="ghost" aria-label={`Listen to ${t.name}`} onClick={async () => setTrackUrl(trackUrl?.id === t.id ? null : { id: t.id, url: await signedUrl(t.storage_path) })}><Play /></Button>
+                  </div>
+                  {trackUrl?.id === t.id && trackUrl.url && <audio src={trackUrl.url} controls autoPlay className="w-full" />}
+                </li>
               ))}
               {!tracks.length && <li className="text-muted-foreground">No tracks yet. No music is bundled; use only music you are licensed to publish.</li>}
             </ul>
@@ -211,7 +219,12 @@ function AudioPage() {
           <DialogHeader><DialogTitle>{compare?.a.file_name}</DialogTitle></DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
             <div><Badge variant="muted" className="mb-1">Original</Badge>{compare?.orig && <video src={compare.orig} controls className="max-h-[50vh] w-full rounded-lg" />}</div>
-            <div><Badge variant="teal" className="mb-1">With music</Badge>{compare?.out ? <video src={compare.out} controls className="max-h-[50vh] w-full rounded-lg" /> : <p className="text-sm text-muted-foreground">Not rendered yet.</p>}</div>
+            <div><Badge variant="teal" className="mb-1">With music</Badge>{compare?.out ? <video src={compare.out} controls className="max-h-[50vh] w-full rounded-lg" /> : <p className="text-sm text-muted-foreground">Not rendered yet. Music is only added once the render worker on your computer has processed this Reel.</p>}</div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {compare?.a.audio_state === "silent" || compare?.a.audio_state === "missing" ? "The original has no audible sound — that is expected for this Reel." : "If you hear nothing, check the volume button on the player."}
+          </p>
+          <div className="hidden">
           </div>
         </DialogContent>
       </Dialog>
