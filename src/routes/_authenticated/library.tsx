@@ -164,10 +164,22 @@ function EditDialog({ asset, onClose, onSave }: { asset: Asset | null; onClose: 
           <Textarea rows={8} value={caption} onChange={(e) => setCaption(e.target.value)} />
           <Input value={topics} onChange={(e) => setTopics(e.target.value)} placeholder="Topics, comma separated" />
           <p className="text-xs text-muted-foreground">Source: {asset?.caption_source ?? "none"}. Captions are never rewritten automatically.</p>
+          {asset?.kind === "reel" && (
+            <div className="space-y-2 rounded-lg bg-muted p-3 text-sm">
+              <label className="flex items-center gap-2">Audio
+                <select aria-label="Audio" className="h-9 rounded-md border bg-background px-2" value={audio} onChange={(e) => setAudio(e.target.value)}>
+                  <option value="">Use default</option>
+                  {AUDIO_MODES.map((m) => <option key={m} value={m}>{AUDIO_MODE_LABEL[m]}</option>)}
+                </select>
+              </label>
+              <label className="flex items-center gap-2"><input type="checkbox" checked={finish} onChange={(e) => setFinish(e.target.checked)} /> Finish in Instagram (add a trending sound yourself)</label>
+              <p className="text-xs text-muted-foreground">{TRENDING_LIMITATION}</p>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="teal" onClick={() => onSave({ caption, caption_issue: caption.trim() ? null : "missing", caption_source: caption !== (asset?.caption ?? "") ? "edited" : asset?.caption_source, topics: topics.split(",").map((t) => t.trim()).filter(Boolean), approved: false })}>
+          <Button variant="teal" onClick={() => onSave({ caption, caption_issue: caption.trim() ? null : "missing", caption_source: caption !== (asset?.caption ?? "") ? "edited" : asset?.caption_source, topics: topics.split(",").map((t) => t.trim()).filter(Boolean), approved: false, audio_mode: audio || null, finish_in_instagram: finish })}>
             Save
           </Button>
         </DialogFooter>

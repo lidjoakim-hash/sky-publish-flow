@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AudioBadge, Empty, PageHeader, Panel, Stat } from "@/components/app-ui";
 import { supabase } from "@/integrations/supabase/client";
-import { assetsQuery, jobsQuery, signedUrl, tracksQuery, type Asset } from "@/lib/queries";
+import { assetsQuery, jobsQuery, settingsQuery, signedUrl, tracksQuery, type Asset } from "@/lib/queries";
+import { AUDIO_MODES, AUDIO_MODE_LABEL, TRENDING_LIMITATION, effectiveAudioMode } from "@/lib/reel-audio";
 import { probeAudioInBrowser, reelAudioOk } from "@/lib/audio";
 
 export const Route = createFileRoute("/_authenticated/audio")({
@@ -26,6 +27,15 @@ function AudioPage() {
   const { data: assets = [] } = useQuery(assetsQuery);
   const { data: tracks = [] } = useQuery(tracksQuery);
   const { data: jobs = [] } = useQuery(jobsQuery);
+  const { data: settings } = useQuery(settingsQuery);
+  async function setDefaultAudio(v: string) {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    const { error } = await supabase.from("settings").update({ reel_audio_mode: v }).eq("user_id", u.user.id);
+    if (error) return toast.error(error.message);
+    toast.success(`Default Reel audio: ${AUDIO_MODE_LABEL[effectiveAudioMode(v, null)]}`);
+    qc.invalidateQueries({ queryKey: ["settings"] });
+  }
   const reels = useMemo(() => assets.filter((a) => a.kind === "reel" && !a.skipped), [assets]);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [trackId, setTrackId] = useState<string>("rotate");
@@ -139,6 +149,12 @@ function AudioPage() {
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4">
+          <Panel title="Default Reel audio">
+            <select aria-label="Default Reel audio" className="h-11 w-full rounded-md border bg-background px-2 text-sm" value={effectiveAudioMode(null, settings?.reel_audio_mode)} onChange={(e) => setDefaultAudio(e.target.value)}>
+              {AUDIO_MODES.map((m) => <option key={m} value={m}>{AUDIO_MODE_LABEL[m]}</option>)}
+            </select>
+            <p className="mt-2 text-xs text-muted-foreground">{TRENDING_LIMITATION} Change a single Reel under Library → Edit.</p>
+          </Panel>
           <Panel title="Your licensed music">
             <Input placeholder="Licence / source note" value={license} onChange={(e) => setLicense(e.target.value)} className="mb-2 h-11" />
             <Button variant="outline" className="w-full" onClick={() => fileRef.current?.click()}><Upload /> Upload MP3 or WAV</Button>
