@@ -31,7 +31,7 @@ export function canMove(id: string, pubs: Pub[]) {
 }
 
 /** The latest-scheduled movable item of the same kind, later than the target — it takes the target's slot. */
-export function swapCandidate(target: Item, items: Item[], pubs: Pub[]): Item | null {
+export function swapCandidate<T extends Item>(target: Item, items: T[], pubs: Pub[]): T | null {
   if (!target.scheduled_at) return null;
   const xs = items
     .filter((a) => a.id !== target.id && a.kind === target.kind && !a.skipped && a.scheduled_at && a.scheduled_at > target.scheduled_at! && canMove(a.id, pubs))
