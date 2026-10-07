@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { workerDenied } from "@/lib/worker-auth.server";
 import { classifyLevel } from "@/lib/audio";
+import { classifyMotion } from "@/lib/motion";
 
 const Body = z.object({
   job_id: z.string().uuid(),
@@ -21,6 +22,7 @@ const Body = z.object({
       size_bytes: z.number(),
       video_codec: z.string(),
       audio_codec: z.string().nullable(),
+      motion: z.object({ frames: z.number().int().min(0), mean: z.number(), p90: z.number(), jitter: z.number(), fast_share: z.number() }).nullable().optional(),
     })
     .optional(),
 });
@@ -55,7 +57,11 @@ export const Route = createFileRoute("/api/public/worker/update")({
         if (!v) return Response.json({ error: "Verification required" }, { status: 400 });
         const level = classifyLevel(v.has_audio, v.rms_db);
         if (job.mode === "probe") {
-          await admin.from("assets").update({ audio_state: level, audio_rms_db: v.rms_db, duration_s: v.duration_s, width: v.width, height: v.height }).eq("id", job.asset_id);
+          const m = v.motion ? classifyMotion(v.motion) : null;
+          await admin.from("assets").update({
+            audio_state: level, audio_rms_db: v.rms_db, duration_s: v.duration_s, width: v.width, height: v.height,
+            ...(m && v.motion ? { motion_label: m.label, motion_score: m.score, motion_confidence: m.confidence, motion_stats: v.motion } : {}),
+          }).eq("id", job.asset_id);
           await admin.from("render_jobs").update({ status: "completed", progress: 100, verification: v, updated_at: now }).eq("id", job.id);
           return Response.json({ ok: true });
         }
