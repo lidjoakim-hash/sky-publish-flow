@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarCheck, CalendarPlus, Download, Eye, EyeOff, Film, Image as ImageIcon, Pencil, Wand2 } from "lucide-react";
+import { Activity, CalendarCheck, CalendarPlus, Download, Eye, EyeOff, Film, Image as ImageIcon, Pencil, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +15,7 @@ import { assetsQuery, signedUrl, type Asset } from "@/lib/queries";
 import { formatOslo } from "@/lib/schedule";
 import { readiness } from "@/lib/readiness";
 import { metaIssues } from "@/lib/meta-format";
+import { isFlaggedMotion, MOTION_TEXT, type MotionLabel } from "@/lib/motion";
 import { AUDIO_MODES, AUDIO_MODE_LABEL, TRENDING_LIMITATION } from "@/lib/reel-audio";
 
 export const Route = createFileRoute("/_authenticated/library")({
@@ -22,7 +23,7 @@ export const Route = createFileRoute("/_authenticated/library")({
   component: LibraryPage,
 });
 
-type Filter = "all" | "reel" | "post" | "needs" | "skipped" | "seasonal" | "scheduled" | "unscheduled";
+type Filter = "all" | "reel" | "post" | "needs" | "skipped" | "seasonal" | "scheduled" | "unscheduled" | "shaky";
 
 function LibraryPage() {
   const qc = useQueryClient();
@@ -40,6 +41,7 @@ function LibraryPage() {
         if (filter === "skipped") return a.skipped;
         if (filter === "seasonal") return a.seasonal;
         if (filter === "needs") return !a.skipped && readiness(a).some((r) => !r.startsWith("Seasonal"));
+        if (filter === "shaky") return !a.skipped && a.kind === "reel" && isFlaggedMotion(a.motion_label);
         if (filter === "scheduled") return !a.skipped && !!a.scheduled_at;
         if (filter === "unscheduled") return !a.skipped && !a.scheduled_at && a.upload_state === "done";
         return true;
@@ -48,6 +50,23 @@ function LibraryPage() {
   );
   const scheduledCount = assets.filter((a) => !a.skipped && a.scheduled_at).length;
   const newCount = assets.filter((a) => !a.skipped && !a.scheduled_at && a.upload_state === "done").length;
+
+  const flagged = assets.filter((a) => !a.skipped && a.kind === "reel" && isFlaggedMotion(a.motion_label));
+  const unchecked = assets.filter((a) => !a.skipped && a.kind === "reel" && a.upload_state === "done" && !a.motion_label);
+
+  async function checkMotion() {
+    const { error } = await supabase.from("render_jobs").insert(unchecked.map((a) => ({ asset_id: a.id, mode: "probe" })));
+    if (error) return toast.error(error.message);
+    toast.success(`${unchecked.length} Reels queued — the render program on your computer measures the movement.`);
+  }
+
+  async function skipFlagged() {
+    if (!confirm(`Skip ${flagged.length} shaky/fast Reels? Files are kept and you can unskip any time.`)) return;
+    const { error } = await supabase.from("assets").update({ skipped: true, approved: false, scheduled_at: null }).in("id", flagged.map((a) => a.id));
+    if (error) toast.error(error.message);
+    else toast.success(`Skipped ${flagged.length} Reels`);
+    qc.invalidateQueries({ queryKey: ["assets"] });
+  }
 
   async function patch(id: string, p: Partial<Asset>) {
     const { error } = await supabase.from("assets").update(p).eq("id", id);
@@ -94,6 +113,13 @@ function LibraryPage() {
           {newCount > 0 ? <Link to="/calendar" search={{ plan: "new" }}><Wand2 /> Schedule {newCount} new items</Link> : <span><Wand2 /> Nothing new to schedule</span>}
         </Button>
       </div>
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3 shadow-card">
+        <Activity className="size-4 text-teal" />
+        <span className="text-sm font-semibold">Camera movement</span>
+        <Button size="sm" variant="outline" disabled={!unchecked.length} onClick={checkMotion}>Check {unchecked.length} Reels</Button>
+        <Button size="sm" variant={filter === "shaky" ? "teal" : "outline"} onClick={() => setFilter("shaky")}>Too shaky / fast ({flagged.length})</Button>
+        <Button size="sm" variant="destructive" className="ml-auto" disabled={!flagged.length} onClick={skipFlagged}>Skip all {flagged.length} flagged</Button>
+      </div>
       <div className="mb-4 flex flex-col gap-2 sm:flex-row">
         <Input placeholder="Search file, caption or topic" value={q} onChange={(e) => setQ(e.target.value)} className="h-11 sm:max-w-xs" />
         <Select value={filter} onValueChange={(v) => setFilter(v as Filter)}>
@@ -106,6 +132,7 @@ function LibraryPage() {
             <SelectItem value="post">Image posts</SelectItem>
             <SelectItem value="needs">Needs attention</SelectItem>
             <SelectItem value="seasonal">Seasonal topics</SelectItem>
+            <SelectItem value="shaky">Too shaky / fast</SelectItem>
             <SelectItem value="skipped">Skipped</SelectItem>
           </SelectContent>
         </Select>
@@ -131,6 +158,11 @@ function LibraryPage() {
                   {a.topics.slice(0, 3).map((t) => <Badge key={t} variant="muted">{t}</Badge>)}
                   {issues.map((i) => <Badge key={i} variant="warning">{i}</Badge>)}
                   {a.approved && <Badge variant="success">Approved</Badge>}
+                  {a.kind === "reel" && a.motion_label && (
+                    <Badge variant={isFlaggedMotion(a.motion_label) ? "warning" : "muted"}>
+                      {MOTION_TEXT[a.motion_label as MotionLabel] ?? a.motion_label} · {Math.round(Number(a.motion_confidence ?? 0) * 100)}% sure
+                    </Badge>
+                  )}
                 </div>
                 {metaIssues(a).filter((i) => i.level === "tip").map((i) => (
                   <p key={i.text} className="mt-1 text-xs text-muted-foreground">Meta tip: {i.text}</p>
