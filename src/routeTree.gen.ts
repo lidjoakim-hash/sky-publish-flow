@@ -17,6 +17,7 @@ import { Route as AuthenticatedConnectionsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedIdeasRouteImport } from './routes/_authenticated/ideas'
 import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated/import'
 import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
+import { Route as AuthenticatedNextRouteImport } from './routes/_authenticated/next'
 import { Route as AuthenticatedOrganizeRouteImport } from './routes/_authenticated/organize'
 import { Route as AuthenticatedOverviewRouteImport } from './routes/_authenticated/overview'
 import { Route as AuthenticatedPerformanceRouteImport } from './routes/_authenticated/performance'
@@ -64,6 +65,11 @@ const AuthenticatedImportRoute = AuthenticatedImportRouteImport.update({
 const AuthenticatedLibraryRoute = AuthenticatedLibraryRouteImport.update({
   id: '/library',
   path: '/library',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedNextRoute = AuthenticatedNextRouteImport.update({
+  id: '/next',
+  path: '/next',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedOrganizeRoute = AuthenticatedOrganizeRouteImport.update({
@@ -116,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/ideas': typeof AuthenticatedIdeasRoute
   '/import': typeof AuthenticatedImportRoute
   '/library': typeof AuthenticatedLibraryRoute
+  '/next': typeof AuthenticatedNextRoute
   '/organize': typeof AuthenticatedOrganizeRoute
   '/overview': typeof AuthenticatedOverviewRoute
   '/performance': typeof AuthenticatedPerformanceRoute
@@ -133,6 +140,7 @@ export interface FileRoutesByTo {
   '/ideas': typeof AuthenticatedIdeasRoute
   '/import': typeof AuthenticatedImportRoute
   '/library': typeof AuthenticatedLibraryRoute
+  '/next': typeof AuthenticatedNextRoute
   '/organize': typeof AuthenticatedOrganizeRoute
   '/overview': typeof AuthenticatedOverviewRoute
   '/performance': typeof AuthenticatedPerformanceRoute
@@ -152,6 +160,7 @@ export interface FileRoutesById {
   '/_authenticated/ideas': typeof AuthenticatedIdeasRoute
   '/_authenticated/import': typeof AuthenticatedImportRoute
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
+  '/_authenticated/next': typeof AuthenticatedNextRoute
   '/_authenticated/organize': typeof AuthenticatedOrganizeRoute
   '/_authenticated/overview': typeof AuthenticatedOverviewRoute
   '/_authenticated/performance': typeof AuthenticatedPerformanceRoute
@@ -171,6 +180,7 @@ export interface FileRouteTypes {
     | '/ideas'
     | '/import'
     | '/library'
+    | '/next'
     | '/organize'
     | '/overview'
     | '/performance'
@@ -188,6 +198,7 @@ export interface FileRouteTypes {
     | '/ideas'
     | '/import'
     | '/library'
+    | '/next'
     | '/organize'
     | '/overview'
     | '/performance'
@@ -206,6 +217,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ideas'
     | '/_authenticated/import'
     | '/_authenticated/library'
+    | '/_authenticated/next'
     | '/_authenticated/organize'
     | '/_authenticated/overview'
     | '/_authenticated/performance'
@@ -282,6 +294,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLibraryRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/next': {
+      id: '/_authenticated/next'
+      path: '/next'
+      fullPath: '/next'
+      preLoaderRoute: typeof AuthenticatedNextRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/organize': {
       id: '/_authenticated/organize'
       path: '/organize'
@@ -348,6 +367,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedIdeasRoute: typeof AuthenticatedIdeasRoute
   AuthenticatedImportRoute: typeof AuthenticatedImportRoute
   AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRoute
+  AuthenticatedNextRoute: typeof AuthenticatedNextRoute
   AuthenticatedOrganizeRoute: typeof AuthenticatedOrganizeRoute
   AuthenticatedOverviewRoute: typeof AuthenticatedOverviewRoute
   AuthenticatedPerformanceRoute: typeof AuthenticatedPerformanceRoute
@@ -362,6 +382,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIdeasRoute: AuthenticatedIdeasRoute,
   AuthenticatedImportRoute: AuthenticatedImportRoute,
   AuthenticatedLibraryRoute: AuthenticatedLibraryRoute,
+  AuthenticatedNextRoute: AuthenticatedNextRoute,
   AuthenticatedOrganizeRoute: AuthenticatedOrganizeRoute,
   AuthenticatedOverviewRoute: AuthenticatedOverviewRoute,
   AuthenticatedPerformanceRoute: AuthenticatedPerformanceRoute,
