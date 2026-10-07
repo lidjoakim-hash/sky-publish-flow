@@ -65,6 +65,10 @@ export type Database = {
           id: string
           kind: string
           mime: string | null
+          motion_confidence: number | null
+          motion_label: string | null
+          motion_score: number | null
+          motion_stats: Json | null
           objective: string | null
           rel_path: string
           rendered_path: string | null
@@ -107,6 +111,10 @@ export type Database = {
           id?: string
           kind: string
           mime?: string | null
+          motion_confidence?: number | null
+          motion_label?: string | null
+          motion_score?: number | null
+          motion_stats?: Json | null
           objective?: string | null
           rel_path: string
           rendered_path?: string | null
@@ -149,6 +157,10 @@ export type Database = {
           id?: string
           kind?: string
           mime?: string | null
+          motion_confidence?: number | null
+          motion_label?: string | null
+          motion_score?: number | null
+          motion_stats?: Json | null
           objective?: string | null
           rel_path?: string
           rendered_path?: string | null
