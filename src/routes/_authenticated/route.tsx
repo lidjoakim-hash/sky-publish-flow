@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, Gauge, Library, Music2, Send, Plug, Upload, LogOut, PauseCircle, PlayCircle, Compass, Tags, Lightbulb, BarChart3 } from "lucide-react";
+import { Clock, CalendarDays, Gauge, Library, Music2, Send, Plug, Upload, LogOut, PauseCircle, PlayCircle, Compass, Tags, Lightbulb, BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { settingsQuery } from "@/lib/queries";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 const NAV = [
+  { to: "/next", label: "Up next", icon: Clock },
   { to: "/overview", label: "Overview", icon: Gauge },
   { to: "/import", label: "Add batch", icon: Upload },
   { to: "/library", label: "Library", icon: Library },
