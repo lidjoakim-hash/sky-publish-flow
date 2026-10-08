@@ -38,5 +38,5 @@ export function BrandSwitcher() {
 export function useBrandConnection() {
   const { slug } = useActiveBrand();
   const { data: rows } = useQuery(connectionQuery);
-  return { data: rows?.find((r) => r.brand_slug === slug), slug };
+  return { data: Array.isArray(rows) ? rows.find((r) => r.brand_slug === slug) : undefined, slug };
 }
