@@ -8,7 +8,9 @@ import { CheckCircle2, AlertTriangle, CircleDashed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader, Panel } from "@/components/app-ui";
-import { checkMetaConnection } from "@/lib/app.functions";
+import { checkMetaConnection, setBrandPlatforms, setBrandPublishing } from "@/lib/app.functions";
+import { brandPublishingQuery } from "@/lib/queries";
+import { DEFAULT_PLATFORMS, requiredScopes, requiredSecrets } from "@/lib/brand-publishing";
 
 export const Route = createFileRoute("/_authenticated/connections")({
   head: () => ({ meta: [{ title: "Connections — Skyline Publisher" }, { name: "description", content: "Meta accounts, scheduler and render worker status." }, { property: "og:title", content: "Connections — Skyline Publisher" }, { property: "og:description", content: "Meta accounts, scheduler and render worker status." }] }),
@@ -19,51 +21,106 @@ function ConnectionsPage() {
   const qc = useQueryClient();
   const { data: conn, slug } = useBrandConnection();
   const { brand } = useActiveBrand();
+  const { data: bps = [] } = useQuery(brandPublishingQuery);
+  const bp = bps.find((r) => r.brand_slug === slug);
   const brandName = brand?.name ?? slug;
-  const prefix = slug === "skyline" ? "META_" : `META_${slug.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_`;
+  const platforms = bp?.platforms?.length ? bp.platforms : (DEFAULT_PLATFORMS[slug] ?? []);
+  const wantIg = platforms.includes("instagram");
+  const enabled = !!bp?.enabled;
   const check = useServerFn(checkMetaConnection);
+  const savePlatforms = useServerFn(setBrandPlatforms);
+  const toggle = useServerFn(setBrandPublishing);
   const [busy, setBusy] = useState(false);
+  const [testOk, setTestOk] = useState(false);
   const status = conn?.status ?? "not_connected";
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["connection"] });
+    qc.invalidateQueries({ queryKey: ["brand-publishing"] });
+  };
 
-  async function run() {
+  async function act(fn: () => Promise<{ ok?: boolean; status?: string; message?: string | null }>) {
     setBusy(true);
     try {
-      const r = await check({ data: { brand: slug } });
-      (r.status === "connected" ? toast.success : toast.error)(r.message ?? "");
+      const r = await fn();
+      (r.ok || r.status === "connected" ? toast.success : toast.error)(r.message ?? "");
     } catch (e) {
       toast.error((e as Error).message);
     }
     setBusy(false);
-    qc.invalidateQueries({ queryKey: ["connection"] });
+    refresh();
   }
 
   const expSoon = conn?.token_expires_at && new Date(conn.token_expires_at).getTime() - Date.now() < 7 * 864e5;
+  const secrets = requiredSecrets(slug, platforms);
+  const scopes = requiredScopes(platforms);
+  const platformLabel = platforms.length ? platforms.map((p) => (p === "instagram" ? "Instagram" : "Facebook")).join(" + ") : "no platforms chosen";
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
-      <PageHeader title={`Connections — ${brandName}`} subtitle="Each business has its own Facebook and Instagram. Switch business top-left to see its connection. A business only posts once its own accounts are connected." />
-      <Panel title={`${brandName} — Facebook Page + Instagram`} action={<Badge variant={status === "connected" ? "success" : status === "error" ? "danger" : "muted"}>{status === "connected" ? "Connected" : status === "error" ? "Problem" : "Not connected"}</Badge>}>
+      <PageHeader title={`Connections — ${brandName}`} subtitle="Each business has its own accounts and its own posting switch. Switch business top-left to see its connection." />
+
+      <Panel title="Platforms for this business" action={<Badge variant={enabled ? "success" : "muted"}>{enabled ? "Posting on" : "Paused"}</Badge>}>
+        <div className="flex flex-wrap gap-4 text-sm">
+          {(["facebook", "instagram"] as const).map((p) => (
+            <label key={p} className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={platforms.includes(p)}
+                disabled={busy || enabled}
+                onChange={(e) => {
+                  const next = e.target.checked ? [...platforms, p] : platforms.filter((x) => x !== p);
+                  act(() => savePlatforms({ data: { brand: slug, platforms: next } }));
+                }}
+              />
+              {p === "facebook" ? "Facebook Page" : "Instagram"}
+            </label>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">{enabled ? "Pause posting to change platforms." : "Changing platforms requires a new connection check."}</p>
+      </Panel>
+
+      <Panel title={`${brandName} — ${platformLabel}`} action={<Badge variant={status === "connected" ? "success" : status === "error" ? "danger" : "muted"}>{status === "connected" ? "Connected" : status === "error" ? "Problem" : "Not connected"}</Badge>}>
         {status === "connected" ? (
           <div className="space-y-1 text-sm">
-            <p className="flex items-center gap-2"><CheckCircle2 className="size-4 text-success" /> Page: {conn?.page_name} · Instagram: @{conn?.ig_username ?? conn?.ig_user_id}</p>
+            <p className="flex items-center gap-2"><CheckCircle2 className="size-4 text-success" /> Page: {conn?.page_name}{wantIg ? ` · Instagram: @${conn?.ig_username ?? conn?.ig_user_id}` : " · Instagram: not used"}</p>
             <p className="text-muted-foreground">Token expires: {conn?.token_expires_at ? new Date(conn.token_expires_at).toLocaleDateString("nb-NO") : "does not expire (or unknown)"}</p>
             {expSoon && <p className="flex items-center gap-2 text-warning-foreground"><AlertTriangle className="size-4" /> The token expires within a week. Replace it to avoid a pause.</p>}
           </div>
         ) : (
           <div className="space-y-3 text-sm">
             {conn?.last_error && <p className="flex items-start gap-2 text-destructive"><AlertTriangle className="mt-0.5 size-4 shrink-0" /> {conn.last_error}</p>}
-            <p>First version uses a personal server-side token (kept secret, never in the browser):</p>
+            <p>Uses a server-side Page token for this business only (kept secret, never in the browser):</p>
             <ol className="list-decimal space-y-1.5 pl-5 text-muted-foreground">
-              <li>In Meta for Developers, create a Business app you are an admin of, and add Instagram Graph API and Facebook Login for Business.</li>
-              <li>Make sure your Instagram professional account is linked to the {brandName} Facebook Page.</li>
-              <li>In Graph API Explorer, get a long-lived <b>Page</b> access token with: instagram_basic, instagram_content_publish, pages_show_list, pages_read_engagement, pages_manage_posts.</li>
-              <li>Ask in chat to add this business's three secrets (a secure form opens): <code>{prefix}PAGE_ACCESS_TOKEN</code>, <code>{prefix}PAGE_ID</code>, <code>{prefix}IG_USER_ID</code>.</li>
-              <li>Come back and press “Check connection”.</li>
+              <li>In Meta for Developers, use a Business app you are an admin of{wantIg ? ", with Instagram Graph API and Facebook Login for Business" : ", with Facebook Login for Business"}.</li>
+              {wantIg ? <li>Make sure the Instagram professional account is linked to the {brandName} Facebook Page.</li> : <li>No Instagram account is needed for {brandName}.</li>}
+              <li>In Graph API Explorer, get a long-lived <b>Page</b> access token for the {brandName} Page with: {scopes.join(", ")}.</li>
+              <li>Ask in chat to add these secrets (a secure form opens): {secrets.map((n, i) => <span key={n}>{i ? ", " : ""}<code>{n}</code></span>)}.</li>
+              <li>Come back and press “Check connection”. It only reads from Meta — it never posts or queues anything.</li>
             </ol>
-            <p className="text-xs text-muted-foreground">While you are an admin of the app, it can post to your own accounts without App Review. Meta's API cost is free.</p>
           </div>
         )}
-        <Button variant="teal" className="mt-4" onClick={run} disabled={busy}>{busy ? "Checking…" : "Check connection"}</Button>
+        <Button variant="teal" className="mt-4" onClick={() => act(() => check({ data: { brand: slug } }))} disabled={busy || !platforms.length}>{busy ? "Working…" : "Check connection"}</Button>
+      </Panel>
+
+      <Panel title={`Posting for ${brandName}`} action={<Badge variant={enabled ? "success" : "muted"}>{enabled ? "On" : "Paused"}</Badge>}>
+        {enabled ? (
+          <div className="space-y-2 text-sm">
+            <p>Approved {brandName} items post to {platformLabel} while the main publishing switch is on.</p>
+            <Button variant="outline" onClick={() => act(() => toggle({ data: { brand: slug, enabled: false } }))} disabled={busy}>Pause {brandName}</Button>
+          </div>
+        ) : (
+          <div className="space-y-3 text-sm">
+            <p className="text-muted-foreground">{brandName} is paused. The main publishing switch does not turn it on — only this button does.</p>
+            <label className="flex items-start gap-2">
+              <input type="checkbox" className="mt-1" checked={testOk} onChange={(e) => setTestOk(e.target.checked)} />
+              <span>I have reviewed a draft or non-public test post for {brandName} and the Page is correct.</span>
+            </label>
+            <Button variant="teal" onClick={() => act(() => toggle({ data: { brand: slug, enabled: true, testConfirmed: testOk } }))} disabled={busy || status !== "connected" || !testOk}>
+              Turn on posting for {brandName}
+            </Button>
+            {status !== "connected" && <p className="text-xs text-muted-foreground">Check the connection first.</p>}
+          </div>
+        )}
       </Panel>
 
       <Panel title="Cloud scheduler" action={<Badge variant="muted"><CircleDashed className="mr-1 size-3" /> Not scheduled yet</Badge>}>

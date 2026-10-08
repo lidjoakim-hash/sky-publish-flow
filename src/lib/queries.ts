@@ -129,3 +129,13 @@ export const strategyChangesQuery = queryOptions({
     return data;
   },
 });
+
+/** Per-business platform choice and posting switch (read-only for the browser). */
+export const brandPublishingQuery = queryOptions({
+  queryKey: ["brand-publishing"],
+  queryFn: async () => {
+    const { data, error } = await supabase.from("brand_publishing").select("*");
+    if (error) throw error;
+    return data ?? [];
+  },
+});
