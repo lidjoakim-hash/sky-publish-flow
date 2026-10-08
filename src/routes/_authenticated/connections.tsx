@@ -1,4 +1,4 @@
-import { useBrandConnection } from "@/components/brand";
+import { useActiveBrand, useBrandConnection } from "@/components/brand";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -17,7 +17,10 @@ export const Route = createFileRoute("/_authenticated/connections")({
 
 function ConnectionsPage() {
   const qc = useQueryClient();
-  const { data: conn } = useBrandConnection();
+  const { data: conn, slug } = useBrandConnection();
+  const { brand } = useActiveBrand();
+  const brandName = brand?.name ?? slug;
+  const prefix = slug === "skyline" ? "META_" : `META_${slug.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_`;
   const check = useServerFn(checkMetaConnection);
   const [busy, setBusy] = useState(false);
   const status = conn?.status ?? "not_connected";
@@ -25,7 +28,7 @@ function ConnectionsPage() {
   async function run() {
     setBusy(true);
     try {
-      const r = await check();
+      const r = await check({ data: { brand: slug } });
       (r.status === "connected" ? toast.success : toast.error)(r.message ?? "");
     } catch (e) {
       toast.error((e as Error).message);
@@ -38,8 +41,8 @@ function ConnectionsPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
-      <PageHeader title="Connections" subtitle="Real status only. Nothing is shown as working until it has been checked." />
-      <Panel title="Facebook Page + Instagram" action={<Badge variant={status === "connected" ? "success" : status === "error" ? "danger" : "muted"}>{status === "connected" ? "Connected" : status === "error" ? "Problem" : "Not connected"}</Badge>}>
+      <PageHeader title={`Connections — ${brandName}`} subtitle="Each business has its own Facebook and Instagram. Switch business top-left to see its connection. A business only posts once its own accounts are connected." />
+      <Panel title={`${brandName} — Facebook Page + Instagram`} action={<Badge variant={status === "connected" ? "success" : status === "error" ? "danger" : "muted"}>{status === "connected" ? "Connected" : status === "error" ? "Problem" : "Not connected"}</Badge>}>
         {status === "connected" ? (
           <div className="space-y-1 text-sm">
             <p className="flex items-center gap-2"><CheckCircle2 className="size-4 text-success" /> Page: {conn?.page_name} · Instagram: @{conn?.ig_username ?? conn?.ig_user_id}</p>
@@ -52,9 +55,9 @@ function ConnectionsPage() {
             <p>First version uses a personal server-side token (kept secret, never in the browser):</p>
             <ol className="list-decimal space-y-1.5 pl-5 text-muted-foreground">
               <li>In Meta for Developers, create a Business app you are an admin of, and add Instagram Graph API and Facebook Login for Business.</li>
-              <li>Make sure your Instagram professional account is linked to the Skyline Facebook Page.</li>
+              <li>Make sure your Instagram professional account is linked to the {brandName} Facebook Page.</li>
               <li>In Graph API Explorer, get a long-lived <b>Page</b> access token with: instagram_basic, instagram_content_publish, pages_show_list, pages_read_engagement, pages_manage_posts.</li>
-              <li>Add three secrets in Project Settings → Secrets: <code>META_PAGE_ACCESS_TOKEN</code>, <code>META_PAGE_ID</code>, <code>META_IG_USER_ID</code>.</li>
+              <li>Ask in chat to add this business's three secrets (a secure form opens): <code>{prefix}PAGE_ACCESS_TOKEN</code>, <code>{prefix}PAGE_ID</code>, <code>{prefix}IG_USER_ID</code>.</li>
               <li>Come back and press “Check connection”.</li>
             </ol>
             <p className="text-xs text-muted-foreground">While you are an admin of the app, it can post to your own accounts without App Review. Meta's API cost is free.</p>
