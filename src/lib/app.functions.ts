@@ -2,83 +2,115 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { reelAudioOk } from "./audio";
 
-/** Checks the server-side Meta credentials and that the Instagram account belongs to the Page. */
+const SLUG = /^[a-z0-9_-]{1,40}$/;
+
+/**
+ * Read-only connection check for one business: verifies the token belongs to the expected Page and has
+ * the permissions for that business's chosen platforms. Never queues or sends posts; never returns the token.
+ */
 export const checkMetaConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { brand?: string } | undefined) => {
     const brand = d?.brand ?? "skyline";
-    if (!/^[a-z0-9_-]{1,40}$/.test(brand)) throw new Error("Invalid business");
+    if (!SLUG.test(brand)) throw new Error("Invalid business");
     return { brand };
   })
   .handler(async ({ context, data }) => {
-    const { readMetaCreds, metaSecretNames, graph } = await import("./meta.server");
+    const { readMetaCreds, graph } = await import("./meta.server");
+    const { verifyMetaConnection } = await import("./meta-verify");
+    const { requiredSecrets, DEFAULT_PLATFORMS } = await import("./brand-publishing");
     const { supabaseAdmin: admin } = await import("@/integrations/supabase/client.server");
     const brand = data.brand;
-    const c = readMetaCreds(brand);
+    const { data: bp } = await admin.from("brand_publishing").select("platforms").eq("user_id", context.userId).eq("brand_slug", brand).maybeSingle();
+    const platforms = bp?.platforms?.length ? bp.platforms : (DEFAULT_PLATFORMS[brand] ?? []);
     const save = async (row: Record<string, unknown>) => {
       await admin.from("meta_connection").upsert({ user_id: context.userId, brand_slug: brand, checked_at: new Date().toISOString(), ...row });
     };
+    if (!platforms.length) return { status: "not_connected" as const, message: "Choose which platforms this business posts to first." };
+    const c = readMetaCreds(brand, platforms);
     if (!c) {
-      const n = metaSecretNames(brand);
       await save({ status: "not_connected", last_error: "Meta secrets for this business are not set yet" });
-      return { status: "not_connected" as const, message: `Add ${n.token}, ${n.pageId} and ${n.igUserId} as secrets.` };
+      return { status: "not_connected" as const, message: `Add ${requiredSecrets(brand, platforms).join(", ")} as secrets.` };
     }
     try {
-      const page = await graph<{ name: string; instagram_business_account?: { id: string; username?: string } }>(c, "GET", c.pageId, {
-        fields: "name,instagram_business_account{id,username}",
-      });
-      const linked = page.instagram_business_account?.id;
-      if (linked !== c.igUserId) {
-        const msg = `The Instagram account ${c.igUserId} is not the one linked to Page "${page.name}" (${linked ?? "none linked"}).`;
-        await save({ status: "error", page_id: c.pageId, page_name: page.name, last_error: msg });
-        return { status: "error" as const, message: msg };
-      }
-      const dbg = await graph<{ data: { expires_at?: number; data_access_expires_at?: number; scopes?: string[]; is_valid?: boolean } }>(c, "GET", "debug_token", {
-        input_token: c.token,
-      }).catch(() => null);
-      const needed = ["instagram_basic", "instagram_content_publish", "pages_manage_posts", "pages_read_engagement", "pages_show_list"];
-      const scopes = dbg?.data.scopes ?? [];
-      const missing = dbg ? needed.filter((s) => !scopes.includes(s)) : [];
-      const exp = dbg?.data.expires_at ? new Date(dbg.data.expires_at * 1000).toISOString() : null;
-      const status = missing.length ? "error" : "connected";
-      const msg = missing.length ? `Token is missing permissions: ${missing.join(", ")}` : null;
-      await save({
-        status,
-        page_id: c.pageId,
-        page_name: page.name,
-        ig_user_id: linked,
-        ig_username: page.instagram_business_account?.username ?? null,
-        token_expires_at: exp,
-        scopes,
-        last_error: msg,
-      });
-      if (status === "connected") {
-        // Already-dated items of this business get their posting entries now (idempotent).
-        const { data: dated } = await admin.from("assets").select("id").eq("user_id", context.userId).eq("brand_slug", brand).eq("skipped", false).not("scheduled_at", "is", null);
-        const rows = (dated ?? []).flatMap((a) => (["instagram", "facebook"] as const).map((platform) => ({ user_id: context.userId, asset_id: a.id, platform })));
-        for (let i = 0; i < rows.length; i += 500) await admin.from("publications").upsert(rows.slice(i, i + 500), { onConflict: "asset_id,platform", ignoreDuplicates: true });
-      }
-      return { status, message: msg ?? `Connected to ${page.name} and @${page.instagram_business_account?.username ?? linked}` };
+      const r = await verifyMetaConnection(
+        (path, params) => graph(c, "GET", path, params.input_token === "__SELF__" ? { ...params, input_token: c.token } : params),
+        { pageId: c.pageId, igUserId: c.igUserId, platforms, strictScopes: brand !== "skyline" },
+      );
+      const { message, ...rest } = r;
+      await save({ ...rest, last_error: r.status === "connected" ? null : message });
+      return { status: r.status, message };
     } catch (e) {
-      const msg = (e as Error).message;
+      const msg = (e as Error).message.replace(/access_token=[^&\s]+/g, "access_token=***");
       await save({ status: "error", last_error: msg });
       return { status: "error" as const, message: msg };
     }
   });
 
+/** Owner chooses which platforms a business posts to. Only while that business is paused. */
+export const setBrandPlatforms = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { brand: string; platforms: string[] }) => {
+    if (!d || !SLUG.test(d.brand)) throw new Error("Invalid business");
+    return d;
+  })
+  .handler(async ({ context, data }) => {
+    const { normalizePlatforms } = await import("./brand-publishing");
+    const platforms = normalizePlatforms(data.platforms);
+    const { supabaseAdmin: admin } = await import("@/integrations/supabase/client.server");
+    const { data: cur } = await admin.from("brand_publishing").select("enabled").eq("user_id", context.userId).eq("brand_slug", data.brand).maybeSingle();
+    if (cur?.enabled) return { ok: false, message: "Pause posting for this business before changing its platforms." };
+    const { error } = await admin.from("brand_publishing").upsert({ user_id: context.userId, brand_slug: data.brand, platforms, updated_at: new Date().toISOString() });
+    if (error) throw error;
+    // A changed platform list needs a fresh connection check.
+    await admin.from("meta_connection").update({ status: "not_connected", last_error: "Platforms changed — check the connection again" }).eq("user_id", context.userId).eq("brand_slug", data.brand).neq("brand_slug", "skyline");
+    return { ok: true, message: "Platforms saved." };
+  });
+
 /**
- * Activates publishing. Publication rows are created by the assets trigger when items are dated
- * (Skyline only). Only APPROVED items are checked for readiness; unapproved items are never claimed.
+ * Explicit per-business switch. Turning ON requires a checked connection and the owner's confirmation that
+ * a draft/non-public test was reviewed; only then are posting entries created for its approved schedule.
+ * The global switch alone never enables a business.
+ */
+export const setBrandPublishing = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { brand: string; enabled: boolean; testConfirmed?: boolean }) => {
+    if (!d || !SLUG.test(d.brand) || typeof d.enabled !== "boolean") throw new Error("Invalid request");
+    return d;
+  })
+  .handler(async ({ context, data }) => {
+    const { enableBlocker } = await import("./brand-publishing");
+    const { supabaseAdmin: admin } = await import("@/integrations/supabase/client.server");
+    const now = new Date().toISOString();
+    if (!data.enabled) {
+      await admin.from("brand_publishing").update({ enabled: false, updated_at: now }).eq("user_id", context.userId).eq("brand_slug", data.brand);
+      return { ok: true, message: "Posting paused for this business." };
+    }
+    const { data: bp } = await admin.from("brand_publishing").select("platforms").eq("user_id", context.userId).eq("brand_slug", data.brand).maybeSingle();
+    const { data: conn } = await admin.from("meta_connection").select("status").eq("user_id", context.userId).eq("brand_slug", data.brand).maybeSingle();
+    const blocker = enableBlocker({ connected: conn?.status === "connected", testConfirmed: data.testConfirmed === true, platforms: bp?.platforms ?? [] });
+    if (blocker) return { ok: false, message: blocker };
+    const { error } = await admin.from("brand_publishing").update({ enabled: true, enabled_at: now, test_confirmed_at: now, updated_at: now }).eq("user_id", context.userId).eq("brand_slug", data.brand);
+    if (error) throw error;
+    // Queue entries for this business's already-dated items, chosen platforms only (idempotent).
+    const { data: dated } = await admin.from("assets").select("id").eq("user_id", context.userId).eq("brand_slug", data.brand).eq("skipped", false).gt("scheduled_at", now);
+    const rows = (dated ?? []).flatMap((a) => (bp?.platforms ?? []).map((platform) => ({ user_id: context.userId, asset_id: a.id, platform })));
+    for (let i = 0; i < rows.length; i += 500) await admin.from("publications").upsert(rows.slice(i, i + 500), { onConflict: "asset_id,platform", ignoreDuplicates: true });
+    return { ok: true, message: `Posting turned on for this business. Only approved items are posted, and only while the main publishing switch is on.` };
+  });
+
+/**
+ * Turns on the main (global) switch. It does NOT enable any business — each business has its own switch.
+ * Only APPROVED items of enabled businesses are checked for readiness.
  */
 export const activatePublishing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const { activationBlockers } = await import("./publishing-rules");
-    const { data: conns } = await supabase.from("meta_connection").select("brand_slug, status").eq("status", "connected");
-    const brands = (conns ?? []).map((c) => c.brand_slug);
-    if (!brands.length) return { ok: false, message: "Connect and check a business's Meta accounts first." };
-    // Each business posts only with its own connected accounts.
+    const { data: enabled } = await supabase.from("brand_publishing").select("brand_slug").eq("enabled", true);
+    const brands = (enabled ?? []).map((c) => c.brand_slug);
+    if (!brands.length) return { ok: false, message: "No business has posting turned on yet (Connections page)." };
     const { data: assets, error } = await supabase
       .from("assets")
       .select("id, kind, audio_state, caption, approved, skipped, scheduled_at, upload_state")
@@ -91,7 +123,7 @@ export const activatePublishing = createServerFn({ method: "POST" })
     const approved = (assets ?? []).filter((a) => a.approved).length;
     const { error: se } = await supabase.from("settings").upsert({ user_id: userId, publishing_active: true, updated_at: new Date().toISOString() });
     if (se) throw se;
-    return { ok: true, message: `Publishing is active. ${approved} approved items will be posted; unapproved items wait until you approve them.` };
+    return { ok: true, message: `Publishing is active for: ${brands.join(", ")}. ${approved} approved items will be posted; unapproved items wait until you approve them.` };
   });
 
 /** Owner action on a missed slot: put it back into the planner, or skip it. Never posts late. */

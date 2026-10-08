@@ -6,6 +6,7 @@
  */
 import { graph, MetaError, readMetaCreds, ruploadFromUrl, type MetaCreds } from "./meta.server";
 import { missedAlertMessage } from "./publishing-rules";
+import { canSend } from "./brand-publishing";
 import { FINISH_MESSAGE, effectiveAudioMode, needsInstagramFinish, publishFile } from "./reel-audio";
 
 type Admin = Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"];
@@ -77,9 +78,20 @@ export async function runPublisherTick(admin: Admin, owner: string, deadlineMs =
       continue;
     }
     // Each business posts only with its own Meta credentials — never another business's.
+    // Re-check at send time (defence in depth over the DB claim): own switch, chosen platform, own connection.
     const { data: a } = await admin.from("assets").select("brand_slug").eq("id", pub.asset_id).single();
-    const brand = a?.brand_slug ?? "skyline";
-    const creds = readMetaCreds(brand);
+    if (!a) { await release(); continue; }
+    const brand = a.brand_slug;
+    const [{ data: bp }, { data: conn }, { data: st }] = await Promise.all([
+      admin.from("brand_publishing").select("brand_slug, platforms, enabled").eq("user_id", pub.user_id).eq("brand_slug", brand).maybeSingle(),
+      admin.from("meta_connection").select("status").eq("user_id", pub.user_id).eq("brand_slug", brand).maybeSingle(),
+      admin.from("settings").select("publishing_active").eq("user_id", pub.user_id).maybeSingle(),
+    ]);
+    if (!canSend({ globalActive: !!st?.publishing_active, row: bp, connected: conn?.status === "connected", brand }, pub.platform)) {
+      await release();
+      continue;
+    }
+    const creds = readMetaCreds(brand, bp?.platforms ?? []);
     if (!creds) {
       report.skippedNoCreds = true;
       await release();
@@ -123,6 +135,7 @@ async function step(admin: Admin, c: MetaCreds, pub: Pub) {
 }
 
 async function stepInstagram(admin: Admin, c: MetaCreds, pub: Pub) {
+  if (!c.igUserId) throw new MetaError("Instagram is not set up for this business", "permanent");
   if (pub.status === "pending" || pub.status === "retry") {
     // Trending sounds can't be added via the API: hand the Reel to the owner, nothing is sent.
     const { data: chk } = await admin.from("assets").select("kind, finish_in_instagram, file_name").eq("id", pub.asset_id).single();

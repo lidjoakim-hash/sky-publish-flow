@@ -1,24 +1,26 @@
 /** Minimal Meta Graph API client (server only). Credentials come from project secrets. */
+import { metaSecretNames } from "./brand-publishing";
 export interface MetaCreds {
   token: string;
   pageId: string;
-  igUserId: string;
+  igUserId: string | null;
   version: string;
 }
 
-/** Secret names per business. Skyline keeps the original names; others use META_<SLUG>_*. */
-export function metaSecretNames(brand: string) {
-  const p = brand === "skyline" ? "META_" : `META_${brand.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_`;
-  return { token: `${p}PAGE_ACCESS_TOKEN`, pageId: `${p}PAGE_ID`, igUserId: `${p}IG_USER_ID` };
-}
+export { metaSecretNames };
 
-export function readMetaCreds(brand = "skyline"): MetaCreds | null {
+/**
+ * Reads ONLY this business's secrets — never another business's. The Instagram id is required
+ * only when the business posts to Instagram.
+ */
+export function readMetaCreds(brand = "skyline", platforms: readonly string[] = ["instagram", "facebook"]): MetaCreds | null {
   const n = metaSecretNames(brand);
   const token = process.env[n.token];
   const pageId = process.env[n.pageId];
-  const igUserId = process.env[n.igUserId];
-  if (!token || !pageId || !igUserId) return null;
-  return { token, pageId, igUserId, version: process.env["META_GRAPH_VERSION"] || "v23.0" };
+  const igUserId = platforms.includes("instagram") ? process.env[n.igUserId] : undefined;
+  if (!token || !pageId) return null;
+  if (platforms.includes("instagram") && !igUserId) return null;
+  return { token, pageId, igUserId: igUserId ?? null, version: process.env["META_GRAPH_VERSION"] || "v23.0" };
 }
 
 export class MetaError extends Error {
