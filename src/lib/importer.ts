@@ -187,6 +187,8 @@ export interface RunOptions {
   userId: string;
   allowRepeat: boolean;
   startIndex: number;
+  /** Business the imported files belong to; fixed when the import starts. */
+  brandSlug: string;
 }
 
 export async function runImport(source: { kind: "files"; files: File[] } | { kind: "zip"; file: File }, opts: RunOptions, cb: ImportCallbacks) {
