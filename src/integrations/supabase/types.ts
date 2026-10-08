@@ -259,6 +259,36 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_publishing: {
+        Row: {
+          brand_slug: string
+          enabled: boolean
+          enabled_at: string | null
+          platforms: string[]
+          test_confirmed_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand_slug: string
+          enabled?: boolean
+          enabled_at?: string | null
+          platforms?: string[]
+          test_confirmed_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand_slug?: string
+          enabled?: boolean
+          enabled_at?: string | null
+          platforms?: string[]
+          test_confirmed_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       brands: {
         Row: {
           created_at: string
@@ -709,8 +739,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      brand_can_publish: {
-        Args: { _brand: string; _user: string }
+      brand_platform_enabled: {
+        Args: { _brand: string; _platform: string; _user: string }
         Returns: boolean
       }
       claim_publications: {
