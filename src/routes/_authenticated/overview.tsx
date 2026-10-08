@@ -5,14 +5,14 @@ import { CheckCircle2, Circle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader, Panel, Stat } from "@/components/app-ui";
 import { supabase } from "@/integrations/supabase/client";
-import { alertsQuery, assetsQuery, connectionQuery, publicationsQuery, settingsQuery, jobsQuery } from "@/lib/queries";
+import { alertsQuery, assetsQuery, publicationsQuery, settingsQuery, jobsQuery } from "@/lib/queries";
 import { formatOslo } from "@/lib/schedule";
 import { reelAudioOk } from "@/lib/audio";
 import { lockedAssetIds } from "@/lib/plan";
 import { readiness } from "@/lib/readiness";
 import { bucketLabel, sourceGroupOf } from "@/lib/strategy";
 import { metricsQuery } from "@/lib/queries";
-import { useActiveBrand } from "@/components/brand";
+import { useActiveBrand, useBrandConnection } from "@/components/brand";
 import { MissedPanel } from "@/components/missed";
 
 export const Route = createFileRoute("/_authenticated/overview")({
@@ -25,7 +25,7 @@ function Overview() {
   const { data: assets = [] } = useQuery(assetsQuery);
   const { data: pubs = [] } = useQuery(publicationsQuery);
   const { data: settings } = useQuery(settingsQuery);
-  const { data: conn } = useQuery(connectionQuery);
+  const { data: conn } = useBrandConnection();
   const { data: alerts = [] } = useQuery(alertsQuery);
   const { data: jobs = [] } = useQuery(jobsQuery);
   const { data: metrics = [] } = useQuery(metricsQuery);

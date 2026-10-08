@@ -68,19 +68,24 @@ export async function runPublisherTick(admin: Admin, owner: string, deadlineMs =
     await alert(admin, m.user_id, "warning", missedAlertMessage(m.file_name, m.scheduled_at));
   }
 
-  const creds = readMetaCreds();
-  if (!creds) {
-    report.skippedNoCreds = true;
-    return report;
-  }
   const { data: claimed, error } = await admin.rpc("claim_publications", { _owner: owner, _limit: 6 });
   if (error) throw error;
   for (const pub of (claimed ?? []) as Pub[]) {
+    const release = () => admin.from("publications").update({ lease_owner: null, lease_until: null }).eq("id", pub.id);
     if (Date.now() - started > deadlineMs) {
-      await admin.from("publications").update({ lease_owner: null, lease_until: null }).eq("id", pub.id);
+      await release();
       continue;
     }
-    await step(admin, creds, pub).catch((e) => handleError(admin, pub, e));
+    // Each business posts only with its own Meta credentials — never another business's.
+    const { data: a } = await admin.from("assets").select("brand_slug").eq("id", pub.asset_id).single();
+    const brand = a?.brand_slug ?? "skyline";
+    const creds = readMetaCreds(brand);
+    if (!creds) {
+      report.skippedNoCreds = true;
+      await release();
+      continue;
+    }
+    await step(admin, creds, pub).catch((e) => handleError(admin, pub, e, brand));
     report.processed++;
   }
   return report;
@@ -188,12 +193,12 @@ async function stepFacebook(admin: Admin, c: MetaCreds, pub: Pub) {
 
 const later = (admin: Admin, id: string) => set(admin, id, { next_attempt_at: new Date(Date.now() + 90000).toISOString(), lease_owner: null, lease_until: null });
 
-async function handleError(admin: Admin, pub: Pub, e: unknown) {
+async function handleError(admin: Admin, pub: Pub, e: unknown, brand = "skyline") {
   const err = e instanceof MetaError ? e : new MetaError((e as Error).message ?? String(e), "unknown");
   const msg = err.message.slice(0, 500);
   if (err.kind === "auth") {
     await admin.from("settings").update({ publishing_active: false }).eq("user_id", pub.user_id);
-    await admin.from("meta_connection").upsert({ user_id: pub.user_id, status: "error", last_error: msg, checked_at: new Date().toISOString() });
+    await admin.from("meta_connection").upsert({ user_id: pub.user_id, brand_slug: brand, status: "error", last_error: msg, checked_at: new Date().toISOString() });
     await set(admin, pub.id, { status: pub.status === "sending" || pub.status === "publishing" ? "unknown" : "retry", last_error: msg, lease_owner: null, lease_until: null });
     await alert(admin, pub.user_id, "error", "Publishing paused: the Meta access token was rejected or expired.");
     return;

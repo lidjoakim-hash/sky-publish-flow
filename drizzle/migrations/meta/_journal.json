@@ -71,6 +71,13 @@
       "when": 1791471493099,
       "tag": "0009_job_tick_token",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791478208813,
+      "tag": "0010_brand_meta_connections",
+      "breakpoints": true
     }
   ]
 }

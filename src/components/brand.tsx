@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { brandsQuery, settingsQuery } from "@/lib/queries";
+import { brandsQuery, connectionQuery, settingsQuery } from "@/lib/queries";
 import type { BrandStrategy } from "@/lib/strategy";
 
 export function useActiveBrand() {
@@ -32,4 +32,11 @@ export function BrandSwitcher() {
       </select>
     </label>
   );
+}
+
+/** The Meta connection of the business currently selected in the top-left switcher. */
+export function useBrandConnection() {
+  const { slug } = useActiveBrand();
+  const { data: rows } = useQuery(connectionQuery);
+  return { data: rows?.find((r) => r.brand_slug === slug), slug };
 }

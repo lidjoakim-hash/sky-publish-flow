@@ -387,6 +387,7 @@ export type Database = {
       }
       meta_connection: {
         Row: {
+          brand_slug: string
           checked_at: string | null
           ig_user_id: string | null
           ig_username: string | null
@@ -399,6 +400,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          brand_slug?: string
           checked_at?: string | null
           ig_user_id?: string | null
           ig_username?: string | null
@@ -411,6 +413,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          brand_slug?: string
           checked_at?: string | null
           ig_user_id?: string | null
           ig_username?: string | null
@@ -706,6 +709,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      brand_can_publish: {
+        Args: { _brand: string; _user: string }
+        Returns: boolean
+      }
       claim_publications: {
         Args: { _limit: number; _owner: string }
         Returns: {
