@@ -53,9 +53,9 @@ export const batchesQuery = queryOptions({
 export const connectionQuery = queryOptions({
   queryKey: ["connection"],
   queryFn: async () => {
-    const { data, error } = await supabase.from("meta_connection").select("*").maybeSingle();
+    const { data, error } = await supabase.from("meta_connection").select("*");
     if (error) throw error;
-    return data;
+    return data ?? [];
   },
 });
 

@@ -1,10 +1,11 @@
+import { useBrandConnection } from "@/components/brand";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Film, Image as ImageIcon, AlertTriangle, ArrowDownToLine, XCircle, Heart, MessageCircle, Send, Bookmark, ThumbsUp, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { assetsQuery, publicationsQuery, connectionQuery, signedUrl, type Asset } from "@/lib/queries";
+import { assetsQuery, publicationsQuery, signedUrl, type Asset } from "@/lib/queries";
 import { osloDateKey } from "@/lib/schedule";
 import { metaIssues } from "@/lib/meta-format";
 import { runway, swapCandidate, canMove } from "@/lib/upnext";
@@ -131,7 +132,7 @@ function addDays(key: string, n: number) {
 
 function PreviewDialog({ asset, assets, pubs, onClose }: { asset: Asset | null; assets: Asset[]; pubs: { asset_id: string; status: string }[]; onClose: () => void }) {
   const qc = useQueryClient();
-  const { data: conn } = useQuery(connectionQuery);
+  const { data: conn } = useBrandConnection();
   const [media, setMedia] = useState<{ src: string | null; video: boolean }>({ src: null, video: false });
   const [busy, setBusy] = useState(false);
 

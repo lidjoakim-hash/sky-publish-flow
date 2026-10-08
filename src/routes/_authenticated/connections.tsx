@@ -1,3 +1,4 @@
+import { useBrandConnection } from "@/components/brand";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -7,7 +8,6 @@ import { CheckCircle2, AlertTriangle, CircleDashed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader, Panel } from "@/components/app-ui";
-import { connectionQuery } from "@/lib/queries";
 import { checkMetaConnection } from "@/lib/app.functions";
 
 export const Route = createFileRoute("/_authenticated/connections")({
@@ -17,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/connections")({
 
 function ConnectionsPage() {
   const qc = useQueryClient();
-  const { data: conn } = useQuery(connectionQuery);
+  const { data: conn } = useBrandConnection();
   const check = useServerFn(checkMetaConnection);
   const [busy, setBusy] = useState(false);
   const status = conn?.status ?? "not_connected";

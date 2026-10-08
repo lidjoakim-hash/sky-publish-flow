@@ -5,16 +5,23 @@ import { reelAudioOk } from "./audio";
 /** Checks the server-side Meta credentials and that the Instagram account belongs to the Page. */
 export const checkMetaConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { readMetaCreds, graph } = await import("./meta.server");
+  .inputValidator((d: { brand?: string } | undefined) => {
+    const brand = d?.brand ?? "skyline";
+    if (!/^[a-z0-9_-]{1,40}$/.test(brand)) throw new Error("Invalid business");
+    return { brand };
+  })
+  .handler(async ({ context, data }) => {
+    const { readMetaCreds, metaSecretNames, graph } = await import("./meta.server");
     const { supabaseAdmin: admin } = await import("@/integrations/supabase/client.server");
-    const c = readMetaCreds();
+    const brand = data.brand;
+    const c = readMetaCreds(brand);
     const save = async (row: Record<string, unknown>) => {
-      await admin.from("meta_connection").upsert({ user_id: context.userId, checked_at: new Date().toISOString(), ...row });
+      await admin.from("meta_connection").upsert({ user_id: context.userId, brand_slug: brand, checked_at: new Date().toISOString(), ...row });
     };
     if (!c) {
-      await save({ status: "not_connected", last_error: "Meta secrets are not set yet" });
-      return { status: "not_connected" as const, message: "Add META_PAGE_ACCESS_TOKEN, META_PAGE_ID and META_IG_USER_ID in Project Settings → Secrets." };
+      const n = metaSecretNames(brand);
+      await save({ status: "not_connected", last_error: "Meta secrets for this business are not set yet" });
+      return { status: "not_connected" as const, message: `Add ${n.token}, ${n.pageId} and ${n.igUserId} as secrets.` };
     }
     try {
       const page = await graph<{ name: string; instagram_business_account?: { id: string; username?: string } }>(c, "GET", c.pageId, {
@@ -45,6 +52,12 @@ export const checkMetaConnection = createServerFn({ method: "POST" })
         scopes,
         last_error: msg,
       });
+      if (status === "connected") {
+        // Already-dated items of this business get their posting entries now (idempotent).
+        const { data: dated } = await admin.from("assets").select("id").eq("user_id", context.userId).eq("brand_slug", brand).eq("skipped", false).not("scheduled_at", "is", null);
+        const rows = (dated ?? []).flatMap((a) => (["instagram", "facebook"] as const).map((platform) => ({ user_id: context.userId, asset_id: a.id, platform })));
+        for (let i = 0; i < rows.length; i += 500) await admin.from("publications").upsert(rows.slice(i, i + 500), { onConflict: "asset_id,platform", ignoreDuplicates: true });
+      }
       return { status, message: msg ?? `Connected to ${page.name} and @${page.instagram_business_account?.username ?? linked}` };
     } catch (e) {
       const msg = (e as Error).message;
@@ -62,13 +75,15 @@ export const activatePublishing = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const { activationBlockers } = await import("./publishing-rules");
-    const { data: conn } = await supabase.from("meta_connection").select("status").maybeSingle();
-    if (conn?.status !== "connected") return { ok: false, message: "Connect and check your Meta accounts first." };
+    const { data: conns } = await supabase.from("meta_connection").select("brand_slug, status").eq("status", "connected");
+    const brands = (conns ?? []).map((c) => c.brand_slug);
+    if (!brands.length) return { ok: false, message: "Connect and check a business's Meta accounts first." };
+    // Each business posts only with its own connected accounts.
     const { data: assets, error } = await supabase
       .from("assets")
       .select("id, kind, audio_state, caption, approved, skipped, scheduled_at, upload_state")
       .eq("skipped", false)
-      .eq("brand_slug", "skyline") // Meta secrets belong to Skyline; other brands are never sent with them.
+      .in("brand_slug", brands)
       .not("scheduled_at", "is", null);
     if (error) throw error;
     const blockers = activationBlockers(assets ?? []);
