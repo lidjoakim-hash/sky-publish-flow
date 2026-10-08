@@ -140,21 +140,26 @@ export const deleteAssets = createServerFn({ method: "POST" })
     if (!assets?.length) return { ok: false, message: "Nothing found to delete." };
     const { supabaseAdmin: admin } = await import("@/integrations/supabase/client.server");
     const ids = assets.map((a) => a.id);
-    const { data: busy } = await admin
+    // Only a send that is running right now (live lease) blocks deletion; stuck/unknown rows can be removed by the owner.
+    const { data: busy, error: be } = await admin
       .from("publications")
       .select("asset_id")
       .in("asset_id", ids)
-      .in("status", ["sending", "processing", "publishing", "unknown"]);
-    if (busy?.length) {
-      const names = assets.filter((a) => busy.some((b) => b.asset_id === a.id)).map((a) => a.file_name);
-      return { ok: false, message: `Cannot delete while a post is mid-send or needs your check: ${names.join(", ")}. Resolve it in Results first.` };
-    }
-    // These two tables reference assets without cascade; remove their rows first.
-    await admin.from("metric_snapshots").delete().in("asset_id", ids);
-    await admin.from("content_drafts").delete().in("source_asset_id", ids);
-    const paths = assets.flatMap((a) => [a.storage_path, a.cover_path, a.rendered_path].filter((p): p is string => !!p));
+      .gt("lease_until", new Date().toISOString());
+    if (be) throw be;
+    const busyIds = new Set((busy ?? []).map((b) => b.asset_id));
+    const doomed = assets.filter((a) => !busyIds.has(a.id));
+    const kept = assets.filter((a) => busyIds.has(a.id)).map((a) => a.file_name);
+    if (!doomed.length) return { ok: false, deleted: 0, message: `Sending right now, try again in a few minutes: ${kept.join(", ")}` };
+    const dIds = doomed.map((a) => a.id);
+    await admin.from("metric_snapshots").delete().in("asset_id", dIds);
+    await admin.from("content_drafts").delete().in("source_asset_id", dIds);
+    await admin.from("render_jobs").delete().in("asset_id", dIds);
+    await admin.from("publications").delete().in("asset_id", dIds);
+    const paths = doomed.flatMap((a) => [a.storage_path, a.cover_path, a.rendered_path].filter((p): p is string => !!p));
     if (paths.length) await admin.storage.from("media").remove(paths);
-    const { error: de } = await admin.from("assets").delete().in("id", ids).eq("user_id", userId);
+    const { error: de } = await admin.from("assets").delete().in("id", dIds).eq("user_id", userId);
     if (de) throw de;
-    return { ok: true, message: `Deleted ${assets.length} item${assets.length === 1 ? "" : "s"} permanently.` };
+    const extra = kept.length ? ` Kept ${kept.length} that are sending right now: ${kept.join(", ")}.` : "";
+    return { ok: true, deleted: doomed.length, message: `Deleted ${doomed.length} item${doomed.length === 1 ? "" : "s"} permanently.${extra}` };
   });
