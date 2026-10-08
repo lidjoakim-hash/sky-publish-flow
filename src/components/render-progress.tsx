@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Clock3, LoaderCircle, TriangleAlert } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { formatRenderEta, observeRenderProgress, summarizeRenderProgress, type ProgressJob, type ProgressSample } from "@/lib/render-progress";
+import { formatRenderEta, observeRenderProgress, renderJobLabel, renderJobPercent, summarizeRenderProgress, type ProgressJob, type ProgressSample } from "@/lib/render-progress";
 
 export function RenderProgress({ jobs, loading, error }: { jobs: ProgressJob[]; loading?: boolean; error?: boolean }) {
   const samples = useRef(new Map<string, ProgressSample>());
@@ -36,6 +36,23 @@ export function RenderProgress({ jobs, loading, error }: { jobs: ProgressJob[]; 
       </div>
       <div className="relative mt-4 overflow-hidden rounded-full"><Progress value={summary.percent} className="h-2.5 [&>div]:bg-teal [&>div]:duration-1000" />{active && summary.processing > 0 && <div className="render-bar-shimmer pointer-events-none absolute inset-0 bg-teal/20" />}</div>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"><span>{summary.processing} rendering</span><span>{summary.queued} queued</span>{summary.failed > 0 && <span className="text-destructive">{summary.failed} failed</span>}{summary.cancelled > 0 && <span>{summary.cancelled} cancelled</span>}</div>
+      {jobs.length > 0 && (
+        <div className="mt-4 max-h-72 space-y-3 overflow-y-auto border-t pt-3" aria-label="Progress for each Reel">
+          {jobs.map((job) => {
+            const percent = renderJobPercent(job);
+            const failed = job.status === "failed";
+            return (
+              <div key={job.id} className="space-y-1.5">
+                <div className="flex items-center justify-between gap-3 text-xs">
+                  <span className="min-w-0 truncate font-medium">{job.file_name ?? "Reel"}</span>
+                  <span className={failed ? "shrink-0 text-destructive" : "shrink-0 tabular-nums text-muted-foreground"}>{renderJobLabel(job)}</span>
+                </div>
+                <Progress value={percent} aria-label={`${job.file_name ?? "Reel"} render progress`} className="h-2 [&>div]:bg-teal [&>div]:duration-1000" />
+              </div>
+            );
+          })}
+        </div>
+      )}
       {error && <p className="mt-2 flex gap-1 text-xs text-destructive"><TriangleAlert className="size-3.5 shrink-0" />Progress could not be refreshed. Retrying…</p>}
       {!loading && !summary.settled && !summary.processing && <p className="mt-2 text-xs text-muted-foreground">Your render worker must be running on your computer. The estimate appears after progress updates arrive.</p>}
     </section>

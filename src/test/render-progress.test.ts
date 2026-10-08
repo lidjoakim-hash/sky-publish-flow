@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { observeRenderProgress, summarizeRenderProgress } from "../lib/render-progress";
+import { observeRenderProgress, renderJobLabel, renderJobPercent, summarizeRenderProgress } from "../lib/render-progress";
 
 const job = (id: string, status: string, progress = 0, at = 10_000) => ({ id, status, progress, updated_at: new Date(at).toISOString() });
 describe("render progress display", () => {
@@ -28,5 +28,14 @@ describe("render progress display", () => {
     const first = observeRenderProgress([job("a", "processing", 10)], new Map(), 1000);
     const second = observeRenderProgress([job("a", "processing", 30)], first, 11_000);
     expect(summarizeRenderProgress([job("a", "processing", 30, 11_000)], second, 50_000).estimatedMs).toBeNull();
+  });
+  it("shows honest progress for every render state", () => {
+    expect(renderJobPercent(job("queued", "queued", 42))).toBe(42);
+    expect(renderJobLabel(job("queued", "queued", 42))).toBe("Queued · 0%");
+    expect(renderJobPercent(job("active", "processing", 100))).toBe(99);
+    expect(renderJobLabel(job("active", "processing", 64))).toBe("Rendering · 64%");
+    expect(renderJobPercent(job("done", "completed", 95))).toBe(100);
+    expect(renderJobLabel(job("done", "completed", 95))).toBe("Completed");
+    expect(renderJobPercent(job("failed", "failed", 37))).toBe(37);
   });
 });
