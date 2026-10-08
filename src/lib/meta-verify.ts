@@ -19,7 +19,7 @@ export interface VerifyResult {
 
 export async function verifyMetaConnection(
   get: GraphGet,
-  cfg: { pageId: string; igUserId: string | null; platforms: readonly string[] },
+  cfg: { pageId: string; igUserId: string | null; platforms: readonly string[]; strictScopes?: boolean },
 ): Promise<VerifyResult> {
   // 1. The token must belong to exactly this Page (catches another business's token).
   const me = await get<{ id: string; name?: string }>("me", { fields: "id,name" });
@@ -44,7 +44,7 @@ export async function verifyMetaConnection(
   const missing = dbg ? requiredScopes(cfg.platforms).filter((s) => !scopes.includes(s)) : [];
   const exp = dbg?.data.expires_at ? new Date(dbg.data.expires_at * 1000).toISOString() : null;
   const out = { ...base, ig_user_id: ig?.id ?? null, ig_username: ig?.username ?? null, token_expires_at: exp, scopes };
-  if (!dbg) return { ...out, status: "error", message: "Could not read the token's permissions. Check the token and try again." };
+  if (!dbg && cfg.strictScopes !== false) return { ...out, status: "error", message: "Could not read the token's permissions. Check the token and try again." };
   if (missing.length) return { ...out, status: "error", message: `Token is missing permissions: ${missing.join(", ")}` };
   const where = wantIg ? `${page.name} and @${ig?.username ?? ig?.id}` : `${page.name} (Facebook only)`;
   return { ...out, status: "connected", message: `Connected to ${where}. Posting stays paused until you turn it on for this business.` };
