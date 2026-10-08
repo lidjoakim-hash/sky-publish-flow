@@ -8,11 +8,11 @@ export function renderJobPercent(job: ProgressJob) {
   if (job.status === "queued") return 0;
   return job.status === "processing" ? Math.min(99, reported) : reported;
 }
-export function renderJobLabel(job: ProgressJob) {
+export function renderJobLabel(job: ProgressJob, activity = "Rendering") {
   if (job.status === "completed") return "Completed";
   if (job.status === "failed") return "Failed";
   if (job.status === "cancelled") return "Cancelled";
-  if (job.status === "processing") return `Rendering · ${renderJobPercent(job)}%`;
+  if (job.status === "processing") return `${activity} · ${renderJobPercent(job)}%`;
   return "Queued · 0%";
 }
 export function renderFraction(job: ProgressJob) {

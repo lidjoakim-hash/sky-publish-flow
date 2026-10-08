@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Activity, CalendarCheck, CalendarPlus, Download, Eye, EyeOff, Film, Image as ImageIcon, Pencil, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,12 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AudioBadge, Empty, PageHeader } from "@/components/app-ui";
 import { supabase } from "@/integrations/supabase/client";
-import { assetsQuery, signedUrl, type Asset } from "@/lib/queries";
+import { assetsQuery, jobsQuery, signedUrl, type Asset } from "@/lib/queries";
 import { formatOslo } from "@/lib/schedule";
 import { readiness } from "@/lib/readiness";
 import { metaIssues } from "@/lib/meta-format";
 import { isFlaggedMotion, MOTION_TEXT, type MotionLabel } from "@/lib/motion";
 import { AUDIO_MODES, AUDIO_MODE_LABEL, TRENDING_LIMITATION } from "@/lib/reel-audio";
+import { RenderProgress } from "@/components/render-progress";
 
 export const Route = createFileRoute("/_authenticated/library")({
   head: () => ({ meta: [{ title: "Library — Skyline Publisher" }, { name: "description", content: "Review media, captions and readiness." }, { property: "og:title", content: "Library — Skyline Publisher" }, { property: "og:description", content: "Review media, captions and readiness." }] }),
@@ -28,10 +29,18 @@ type Filter = "all" | "reel" | "post" | "needs" | "skipped" | "seasonal" | "sche
 function LibraryPage() {
   const qc = useQueryClient();
   const { data: assets = [] } = useQuery(assetsQuery);
+  const { data: jobs = [], isError: jobsError } = useQuery(jobsQuery);
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
   const [edit, setEdit] = useState<Asset | null>(null);
   const [preview, setPreview] = useState<{ a: Asset; url: string } | null>(null);
+  const [motionJobIds, setMotionJobIds] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const saved: unknown = JSON.parse(sessionStorage.getItem("skyline-motion-progress") ?? "[]");
+      if (Array.isArray(saved) && saved.every((id) => typeof id === "string")) setMotionJobIds(saved);
+    } catch { /* Current active checks remain visible. */ }
+  }, []);
 
   const list = useMemo(
     () =>
@@ -53,10 +62,24 @@ function LibraryPage() {
 
   const flagged = assets.filter((a) => !a.skipped && a.kind === "reel" && isFlaggedMotion(a.motion_label));
   const unchecked = assets.filter((a) => !a.skipped && a.kind === "reel" && a.upload_state === "done" && !a.motion_label);
+  const motionJobs = useMemo(() => {
+    const names = new Map(assets.map((asset) => [asset.id, asset.file_name]));
+    const visible = motionJobIds.length
+      ? jobs.filter((job) => motionJobIds.includes(job.id))
+      : jobs.filter((job) => job.mode === "probe" && ["queued", "processing"].includes(job.status));
+    return visible.map((job) => ({ ...job, file_name: names.get(job.asset_id) ?? "Reel" }));
+  }, [assets, jobs, motionJobIds]);
+  useEffect(() => {
+    if (motionJobs.some((job) => job.status === "completed")) qc.invalidateQueries({ queryKey: ["assets"] });
+  }, [motionJobs, qc]);
 
   async function checkMotion() {
-    const { error } = await supabase.from("render_jobs").insert(unchecked.map((a) => ({ asset_id: a.id, mode: "probe" })));
+    const { data, error } = await supabase.from("render_jobs").insert(unchecked.map((a) => ({ asset_id: a.id, mode: "probe" }))).select("id");
     if (error) return toast.error(error.message);
+    const ids = (data ?? []).map((job) => job.id);
+    setMotionJobIds(ids);
+    try { sessionStorage.setItem("skyline-motion-progress", JSON.stringify(ids)); } catch { /* Optional persistence. */ }
+    await qc.invalidateQueries({ queryKey: ["render_jobs"] });
     toast.success(`${unchecked.length} Reels queued — the render program on your computer measures the movement.`);
   }
 
@@ -119,6 +142,7 @@ function LibraryPage() {
         <Button size="sm" variant="outline" disabled={!unchecked.length} onClick={checkMotion}>Check {unchecked.length} Reels</Button>
         <Button size="sm" variant={filter === "shaky" ? "teal" : "outline"} onClick={() => setFilter("shaky")}>Too shaky / fast ({flagged.length})</Button>
         <Button size="sm" variant="destructive" className="ml-auto" disabled={!flagged.length} onClick={skipFlagged}>Skip all {flagged.length} flagged</Button>
+        {motionJobs.length > 0 && <div className="w-full"><RenderProgress jobs={motionJobs} error={jobsError} purpose="camera" /></div>}
       </div>
       <div className="mb-4 flex flex-col gap-2 sm:flex-row">
         <Input placeholder="Search file, caption or topic" value={q} onChange={(e) => setQ(e.target.value)} className="h-11 sm:max-w-xs" />
