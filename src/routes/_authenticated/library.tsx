@@ -105,6 +105,21 @@ function LibraryPage() {
     qc.invalidateQueries({ queryKey: ["assets"] });
   }
 
+  async function removeAll() {
+    if (!assets.length) return;
+    if (!confirm(`Delete ALL ${assets.length} items permanently? Every file, schedule entry and record is removed from the system. This cannot be undone.`)) return;
+    const typed = prompt(`Type DELETE (in capital letters) to confirm deleting all ${assets.length} items:`);
+    if (typed !== "DELETE") { if (typed !== null) toast("Not deleted — the word did not match."); return; }
+    let deleted = 0;
+    for (let i = 0; i < assets.length; i += 100) {
+      const res = await deleteAssets({ data: { ids: assets.slice(i, i + 100).map((a) => a.id) } });
+      if (!res.ok) { toast.error(res.message); break; }
+      deleted += Math.min(100, assets.length - i);
+    }
+    if (deleted) toast.success(`Deleted ${deleted} items permanently.`);
+    qc.invalidateQueries({ queryKey: ["assets"] });
+  }
+
   async function patch(id: string, p: Partial<Asset>) {
     const { error } = await supabase.from("assets").update(p).eq("id", id);
     if (error) toast.error(error.message);
@@ -141,7 +156,12 @@ function LibraryPage() {
       <PageHeader
         title="Library"
         subtitle={`Step 2 of 4 · ${counts.reel} Reels · ${counts.post} posts · ${counts.needs} need attention`}
-        actions={<Button variant="outline" onClick={exportDraft} disabled={!assets.length}><Download /> Export draft</Button>}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={exportDraft} disabled={!assets.length}><Download /> Export draft</Button>
+            <Button variant="destructive" onClick={removeAll} disabled={!assets.length}><Trash2 /> Delete all</Button>
+          </div>
+        }
       />
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3 shadow-card">
         <Button size="sm" variant={filter === "scheduled" ? "teal" : "outline"} onClick={() => setFilter("scheduled")}><CalendarCheck /> Scheduled ({scheduledCount})</Button>
