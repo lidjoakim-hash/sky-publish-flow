@@ -5,6 +5,7 @@ export const renderSettled = (status: string) => ["completed", "failed", "cancel
 export function renderJobPercent(job: ProgressJob) {
   if (job.status === "completed") return 100;
   const reported = Math.min(100, Math.max(0, Math.round(job.progress)));
+  if (job.status === "queued") return 0;
   return job.status === "processing" ? Math.min(99, reported) : reported;
 }
 export function renderJobLabel(job: ProgressJob) {
