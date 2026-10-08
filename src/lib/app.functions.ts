@@ -122,3 +122,39 @@ export const resolvePublication = createServerFn({ method: "POST" })
     await admin.from("publications").update(patch).eq("id", data.id);
     return { ok: true };
   });
+
+/** Owner-initiated permanent delete: removes the file(s) from storage and every record of the item. */
+export const deleteAssets = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { ids: string[] }) => {
+    if (!d || !Array.isArray(d.ids) || !d.ids.length || d.ids.length > 100 || d.ids.some((id) => typeof id !== "string")) throw new Error("Invalid request");
+    return d;
+  })
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context;
+    const { data: assets, error } = await supabase
+      .from("assets")
+      .select("id, file_name, storage_path, cover_path, rendered_path")
+      .in("id", data.ids);
+    if (error) throw error;
+    if (!assets?.length) return { ok: false, message: "Nothing found to delete." };
+    const { supabaseAdmin: admin } = await import("@/integrations/supabase/client.server");
+    const ids = assets.map((a) => a.id);
+    const { data: busy } = await admin
+      .from("publications")
+      .select("asset_id")
+      .in("asset_id", ids)
+      .in("status", ["sending", "processing", "publishing", "unknown"]);
+    if (busy?.length) {
+      const names = assets.filter((a) => busy.some((b) => b.asset_id === a.id)).map((a) => a.file_name);
+      return { ok: false, message: `Cannot delete while a post is mid-send or needs your check: ${names.join(", ")}. Resolve it in Results first.` };
+    }
+    // These two tables reference assets without cascade; remove their rows first.
+    await admin.from("metric_snapshots").delete().in("asset_id", ids);
+    await admin.from("content_drafts").delete().in("source_asset_id", ids);
+    const paths = assets.flatMap((a) => [a.storage_path, a.cover_path, a.rendered_path].filter((p): p is string => !!p));
+    if (paths.length) await admin.storage.from("media").remove(paths);
+    const { error: de } = await admin.from("assets").delete().in("id", ids).eq("user_id", userId);
+    if (de) throw de;
+    return { ok: true, message: `Deleted ${assets.length} item${assets.length === 1 ? "" : "s"} permanently.` };
+  });
