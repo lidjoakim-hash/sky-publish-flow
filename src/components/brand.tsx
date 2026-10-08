@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { brandsQuery, connectionQuery, settingsQuery } from "@/lib/queries";
+import { assetsQuery, brandsQuery, connectionQuery, publicationsQuery, settingsQuery } from "@/lib/queries";
 import type { BrandStrategy } from "@/lib/strategy";
 
 export function useActiveBrand() {
@@ -39,4 +39,21 @@ export function useBrandConnection() {
   const { slug } = useActiveBrand();
   const { data: rows } = useQuery(connectionQuery);
   return { data: Array.isArray(rows) ? rows.find((r) => r.brand_slug === slug) : undefined, slug };
+}
+
+/** Items and posting entries of the business picked top-left only — never another business's. */
+export function useBrandAssets(opts: { refetchInterval?: number } = {}) {
+  const { slug } = useActiveBrand();
+  const q = useQuery({ ...assetsQuery, ...opts });
+  const all = q.data ?? [];
+  const assets = all.filter((a) => a.brand_slug === slug);
+  return { ...q, data: assets, slug };
+}
+
+export function useBrandPublications(opts: { refetchInterval?: number } = {}) {
+  const { slug } = useActiveBrand();
+  const { data: all = [] } = useQuery(assetsQuery);
+  const q = useQuery({ ...publicationsQuery, ...opts });
+  const ids = new Set(all.filter((a) => a.brand_slug === slug).map((a) => a.id));
+  return { ...q, data: (q.data ?? []).filter((p) => ids.has(p.asset_id)) };
 }

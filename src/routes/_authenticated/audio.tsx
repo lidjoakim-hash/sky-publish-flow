@@ -1,3 +1,4 @@
+import { useBrandAssets, useBrandPublications } from "@/components/brand";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -25,7 +26,7 @@ export const Route = createFileRoute("/_authenticated/audio")({
 
 function AudioPage() {
   const qc = useQueryClient();
-  const { data: assets = [] } = useQuery(assetsQuery);
+  const { data: assets = [] } = useBrandAssets();
   const { data: tracks = [] } = useQuery(tracksQuery);
   const { data: jobs = [], isError: jobsError } = useQuery(jobsQuery);
   const { data: settings } = useQuery(settingsQuery);

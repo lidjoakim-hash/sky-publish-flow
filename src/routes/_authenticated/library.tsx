@@ -1,3 +1,4 @@
+import { useBrandAssets, useBrandPublications } from "@/components/brand";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -29,7 +30,7 @@ type Filter = "all" | "reel" | "post" | "needs" | "skipped" | "seasonal" | "sche
 
 function LibraryPage() {
   const qc = useQueryClient();
-  const { data: assets = [] } = useQuery(assetsQuery);
+  const { data: assets = [] } = useBrandAssets();
   const { data: jobs = [], isError: jobsError } = useQuery(jobsQuery);
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");

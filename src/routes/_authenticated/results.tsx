@@ -1,3 +1,4 @@
+import { useBrandAssets, useBrandPublications } from "@/components/brand";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -18,8 +19,8 @@ export const Route = createFileRoute("/_authenticated/results")({
 
 function ResultsPage() {
   const qc = useQueryClient();
-  const { data: assets = [] } = useQuery(assetsQuery);
-  const { data: pubs = [] } = useQuery({ ...publicationsQuery, refetchInterval: 15000 });
+  const { data: assets = [] } = useBrandAssets();
+  const { data: pubs = [] } = useBrandPublications({ refetchInterval: 15000 });
   const resolve = useServerFn(resolvePublication);
   const rows = useMemo(() => {
     const by = new Map<string, Publication[]>();
