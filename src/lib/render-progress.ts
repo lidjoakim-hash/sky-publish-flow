@@ -1,7 +1,20 @@
 /** Presentation-only estimates from observed worker progress, never simulated progress. */
-export type ProgressJob = { id: string; status: string; progress: number; updated_at: string };
+export type ProgressJob = { id: string; status: string; progress: number; updated_at: string; file_name?: string };
 export type ProgressSample = { firstAt: number; firstValue: number; lastAt: number; lastValue: number };
 export const renderSettled = (status: string) => ["completed", "failed", "cancelled"].includes(status);
+export function renderJobPercent(job: ProgressJob) {
+  if (job.status === "completed") return 100;
+  const reported = Math.min(100, Math.max(0, Math.round(job.progress)));
+  if (job.status === "queued") return 0;
+  return job.status === "processing" ? Math.min(99, reported) : reported;
+}
+export function renderJobLabel(job: ProgressJob) {
+  if (job.status === "completed") return "Completed";
+  if (job.status === "failed") return "Failed";
+  if (job.status === "cancelled") return "Cancelled";
+  if (job.status === "processing") return `Rendering · ${renderJobPercent(job)}%`;
+  return "Queued · 0%";
+}
 export function renderFraction(job: ProgressJob) {
   return renderSettled(job.status) ? 1 : job.status === "processing" ? Math.min(0.99, Math.max(0, job.progress / 100)) : 0;
 }

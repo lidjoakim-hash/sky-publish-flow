@@ -52,7 +52,11 @@ function AudioPage() {
       if (Array.isArray(saved) && saved.every((id) => typeof id === "string")) setRenderIds(saved);
     } catch { /* Progress remains available from the current queue. */ }
   }, []);
-  const progressJobs = useMemo(() => renderIds.length ? jobs.filter((j) => renderIds.includes(j.id)) : jobs.filter((j) => j.mode !== "probe" && ["queued", "processing"].includes(j.status)), [jobs, renderIds]);
+  const progressJobs = useMemo(() => {
+    const names = new Map(assets.map((asset) => [asset.id, asset.file_name]));
+    const visible = renderIds.length ? jobs.filter((job) => renderIds.includes(job.id)) : jobs.filter((job) => job.mode !== "probe" && ["queued", "processing"].includes(job.status));
+    return visible.map((job) => ({ ...job, file_name: names.get(job.asset_id) ?? "Reel" }));
+  }, [assets, jobs, renderIds]);
   const [compare, setCompare] = useState<{ a: Asset; orig: string | null; out: string | null } | null>(null);
   const [trackUrl, setTrackUrl] = useState<{ id: string; url: string | null } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -235,7 +239,7 @@ function AudioPage() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">{r.file_name}</div>
                       <div className="text-xs text-muted-foreground">{r.audio_rms_db != null ? `Level ${r.audio_rms_db} dB` : ""}{r.duration_s ? ` · ${r.duration_s}s` : ""}</div>
-                      {j && ["queued", "processing"].includes(j.status) && <Progress value={j.progress} className="mt-1 h-1.5" />}
+                      {j && ["queued", "processing"].includes(j.status) && <div className="mt-1 flex items-center gap-2"><Progress value={j.status === "processing" ? Math.min(99, j.progress) : 0} className="h-1.5 flex-1 [&>div]:bg-teal" /><span className="w-9 text-right text-[10px] tabular-nums text-muted-foreground">{j.status === "processing" ? `${Math.min(99, j.progress)}%` : "0%"}</span></div>}
                       {j?.status === "failed" && <div className="text-xs text-destructive">{j.error}</div>}
                     </div>
                     <AudioBadge state={r.audio_state} />
