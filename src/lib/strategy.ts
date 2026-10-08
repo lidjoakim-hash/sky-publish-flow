@@ -57,6 +57,9 @@ export const BRAND_DEFAULTS = [
     voice: "Refined, editorial and documentary wedding photography. Calm, unhurried voice.",
     focus: "Editorial/documentary wedding photography.",
   },
+  { slug: "leadback", name: "Leadback", language: "en", voice: "Clear, helpful and direct. Only claims the owner has verified.", focus: "Leadback — owner to describe services and offers." },
+  { slug: "speakfluent", name: "Speak Fluent", language: "en", voice: "Friendly, encouraging and clear. Only claims the owner has verified.", focus: "Language learning — owner to describe courses and offers." },
+  { slug: "tekstilrens", name: "Tekstilrens Stavanger", language: "nb", voice: "Norsk bokmål. Saklig og vennlig. Vis ekte arbeid i Stavanger.", focus: "Textile cleaning in Stavanger — owner to describe services and prices." },
 ] as const;
 
 /** Session/source group: explicit owner value, else parent folder + file stem minus copy/edit/version markers. */
