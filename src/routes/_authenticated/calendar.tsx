@@ -38,6 +38,10 @@ function CalendarPage() {
   const navigate = Route.useNavigate();
   const { data: assets = [] } = useBrandAssets();
   const { data: pubs = [] } = useBrandPublications();
+  // The planner needs every business's dated items (their slots stay taken) — exactly what the server recomputes with.
+  // It only moves items of the picked business; using the filtered lists here made every save look "stale".
+  const { data: allAssets = [] } = useQuery(assetsQuery);
+  const { data: allPubs = [] } = useQuery(publicationsQuery);
   const { data: settings } = useQuery(settingsQuery);
   const { data: conn } = useBrandConnection();
   const activate = useServerFn(activatePublishing);
@@ -97,7 +101,7 @@ function CalendarPage() {
   async function apply(mode: "append" | "reschedule" | "missed") {
     if (start <= osloDateKey(new Date()) && mode !== "missed") return toast.error("Choose a future start date.");
     if (!(await saveSettings())) return;
-    const res = planWithStrategy({ assets, pubs, startDate: mode === "missed" ? tomorrow : start, postTimes, reelTime, timeZone: settings?.timezone ?? "Europe/Oslo", topicMixing: mixing, mode, brand: slug, strategy });
+    const res = planWithStrategy({ assets: allAssets, pubs: allPubs, startDate: mode === "missed" ? tomorrow : start, postTimes, reelTime, timeZone: settings?.timezone ?? "Europe/Oslo", topicMixing: mixing, mode, brand: slug, strategy });
     if (!res.assignments.size && !res.held.length) return toast("Nothing to schedule.");
     setPreview({ ...res, mode, startDate: start });
   }
