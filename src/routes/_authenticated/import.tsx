@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
+import { importStore, useImportState } from "@/lib/import-store";
+import { useActiveBrand } from "@/components/brand";
 import { toast } from "sonner";
 import { FolderOpen, FileArchive, Files, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader, Panel } from "@/components/app-ui";
 import { supabase } from "@/integrations/supabase/client";
 import { batchesQuery, assetsQuery } from "@/lib/queries";
-import { runImport, type FileProgress } from "@/lib/importer";
 
 export const Route = createFileRoute("/_authenticated/import")({
   head: () => ({ meta: [{ title: "Add batch — Skyline Publisher" }, { name: "description", content: "Import Reels, posts and captions." }, { property: "og:title", content: "Add batch — Skyline Publisher" }, { property: "og:description", content: "Import Reels, posts and captions." }] }),
@@ -26,10 +27,11 @@ function ImportPage() {
   const [name, setName] = useState("");
   const [allowRepeat, setAllowRepeat] = useState(false);
   const [resumeId, setResumeId] = useState<string | null>(null);
-  const [files, setFiles] = useState<Map<string, FileProgress>>(new Map());
-  const [log, setLog] = useState<string[]>([]);
-  const [running, setRunning] = useState(false);
-  const abort = useRef<AbortController | null>(null);
+  const imp = useImportState();
+  const { slug: brandSlug, brand } = useActiveBrand();
+  const running = imp.running;
+  const files = imp.files;
+  const log = imp.log;
   const folderRef = useRef<HTMLInputElement>(null);
   const filesRef = useRef<HTMLInputElement>(null);
   const zipRef = useRef<HTMLInputElement>(null);
@@ -37,46 +39,35 @@ function ImportPage() {
   const list = useMemo(() => [...files.values()], [files]);
   const media = list.filter((f) => f.role === "reel" || f.role === "post");
   const finished = media.filter((f) => ["done", "duplicate", "error"].includes(f.status)).length;
+  const otherBrand = imp.brandSlug && imp.brandSlug !== brandSlug;
 
   async function start(source: { kind: "files"; files: File[] } | { kind: "zip"; file: File }) {
+    if (importStore.get().running) return toast.error("An upload is already running. Wait for it or stop it first.");
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
     let batchId = resumeId;
     if (!batchId) {
       const { data, error } = await supabase
         .from("batches")
-        .insert({ name: name || `Batch ${new Date().toLocaleDateString("nb-NO")}`, source: source.kind, allow_repeat: allowRepeat })
+        .insert({ name: name || `${brand?.name ?? "Batch"} ${new Date().toLocaleDateString("nb-NO")}`, source: source.kind, allow_repeat: allowRepeat })
         .select("id")
         .single();
       if (error) return toast.error(error.message);
       batchId = data.id;
       setResumeId(batchId);
     }
-    setFiles(new Map());
-    setLog([]);
-    setRunning(true);
-    abort.current = new AbortController();
-    try {
-      const r = await runImport(
-        source,
-        { batchId, userId: u.user.id, allowRepeat, startIndex: assets.length ? Math.max(...assets.map((a) => a.sort_index)) + 1 : 0 },
-        {
-          signal: abort.current.signal,
-          onFile: (p) => setFiles((m) => new Map(m).set(p.path, p)),
-          onLog: (msg) => setLog((l) => [...l, msg]),
-        },
-      );
-      toast.success(`Import finished: ${r.planned} media files checked, ${r.captions} caption rows read.`);
-    } catch (e) {
-      if ((e as Error).name === "AbortError") toast("Import stopped. Choose the same files again to resume.");
-      else {
-        toast.error((e as Error).message);
-        setLog((l) => [...l, `Stopped: ${(e as Error).message}. Try the folder option if the archive is too large for this browser.`]);
-      }
-    } finally {
-      setRunning(false);
-      qc.invalidateQueries();
-    }
+    const brandAssets = assets.filter((a) => a.brand_slug === brandSlug);
+    await importStore.start(
+      source,
+      { batchId, userId: u.user.id, allowRepeat, brandSlug, startIndex: brandAssets.length ? Math.max(...brandAssets.map((a) => a.sort_index)) + 1 : 0 },
+      () => {
+        const r = importStore.get().result;
+        if (r?.kind === "done") toast.success(r.message);
+        else if (r?.kind === "stopped") toast(r.message);
+        else if (r) toast.error(r.message);
+        qc.invalidateQueries();
+      },
+    );
   }
 
   const pick = (input: HTMLInputElement | null) => input?.click();
@@ -96,7 +87,8 @@ function ImportPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <PageHeader title="Add batch" subtitle="Step 1 of 4 · Choose your files. Originals and captions are kept exactly as provided." />
+      <PageHeader title="Add batch" subtitle={`Step 1 of 4 · Files go to ${brand?.name ?? "the selected business"}. Originals and captions are kept exactly as provided.`} />
+      {otherBrand && running && <p className="mb-4 rounded-lg border border-warning bg-warning/10 p-3 text-sm">An upload for another business is still running below. It keeps its own business; switch back to see it there too.</p>}
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel className="lg:col-span-2" title="Choose files">
           <div
@@ -150,7 +142,7 @@ function ImportPage() {
               <div className="flex items-center justify-between text-sm">
                 <span>{finished} of {media.length} media files</span>
                 {running && (
-                  <Button size="sm" variant="ghost" onClick={() => abort.current?.abort()}>
+                  <Button size="sm" variant="ghost" onClick={() => importStore.stop()}>
                     <Square /> Stop
                   </Button>
                 )}
@@ -195,7 +187,7 @@ function ImportPage() {
           </Panel>
           <Panel title="Good to know">
             <p className="text-sm text-muted-foreground">
-              The app can only read files you choose; it cannot open G:\ by itself. Keep this tab open while uploading. If a large ZIP stops, unzip it and choose the folder instead.
+              The app can only read files you choose; it cannot open G:\ by itself. Keep this tab open while uploading — you can move to other pages or businesses, the upload keeps going. If a large ZIP stops, unzip it and choose the folder instead.
             </p>
           </Panel>
           <Panel title="Recent batches">
