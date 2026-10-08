@@ -6,10 +6,17 @@ export interface MetaCreds {
   version: string;
 }
 
-export function readMetaCreds(): MetaCreds | null {
-  const token = process.env["META_PAGE_ACCESS_TOKEN"];
-  const pageId = process.env["META_PAGE_ID"];
-  const igUserId = process.env["META_IG_USER_ID"];
+/** Secret names per business. Skyline keeps the original names; others use META_<SLUG>_*. */
+export function metaSecretNames(brand: string) {
+  const p = brand === "skyline" ? "META_" : `META_${brand.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_`;
+  return { token: `${p}PAGE_ACCESS_TOKEN`, pageId: `${p}PAGE_ID`, igUserId: `${p}IG_USER_ID` };
+}
+
+export function readMetaCreds(brand = "skyline"): MetaCreds | null {
+  const n = metaSecretNames(brand);
+  const token = process.env[n.token];
+  const pageId = process.env[n.pageId];
+  const igUserId = process.env[n.igUserId];
   if (!token || !pageId || !igUserId) return null;
   return { token, pageId, igUserId, version: process.env["META_GRAPH_VERSION"] || "v23.0" };
 }
