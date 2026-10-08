@@ -30,7 +30,7 @@ describe("render progress display", () => {
     expect(summarizeRenderProgress([job("a", "processing", 30, 11_000)], second, 50_000).estimatedMs).toBeNull();
   });
   it("shows honest progress for every render state", () => {
-    expect(renderJobPercent(job("queued", "queued", 42))).toBe(42);
+    expect(renderJobPercent(job("queued", "queued", 42))).toBe(0);
     expect(renderJobLabel(job("queued", "queued", 42))).toBe("Queued · 0%");
     expect(renderJobPercent(job("active", "processing", 100))).toBe(99);
     expect(renderJobLabel(job("active", "processing", 64))).toBe("Rendering · 64%");
