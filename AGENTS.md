@@ -20,7 +20,7 @@
 - The cron route /api/public/cron/publish uses authenticateCronRequest; the cron job is created only when the user first activates publishing.
 - Strategy rules (bucket vocabulary, keyword suggestions, source grouping) live in src/lib/strategy.ts; the strategy-aware planner is src/lib/planner.ts, wrapped by planWithStrategy in src/lib/plan.ts and covered by src/test/strategy-rules.test.ts — keeps rotation/cooldown/lock behaviour testable.
 - Calendar plans are previewed client-side; commitSchedule recomputes the plan from persisted data and refuses stale previews, then writes via the commit_schedule DB function (one transaction, row locks, lease/lock/brand/collision checks, all-or-nothing) — the browser cannot bypass planning safeguards.
-- Assets carry brand_slug; planning, organizing, ideas and metrics are scoped per brand, and activatePublishing only enqueues the brand whose Meta secrets exist (skyline) — prevents posting one brand to another's accounts.
+- Assets carry brand_slug; planning, organizing, ideas and metrics are scoped per brand, and each brand posts only with its own Meta secrets (Skyline: META_*, others: META_<SLUG>_*) and only once its own meta_connection row is connected (brand_can_publish) — prevents posting one brand to another's accounts.
 - metric_snapshots are separate from publications; clients may only write source manual/csv, meta_api rows come from the server — metrics can never alter publish status.
 - Weight advice (src/lib/feedback.ts) uses medians and a minimum sample, enforces step bounds and the diversity floor on the final shares, keeps unsampled weights exact and returns current weights untouched when evidence or settings are insufficient; and is applied only by explicit owner action logged in strategy_changes.
 - Idea briefs are template-based (src/lib/ideas.ts), stored in content_drafts, never overwrite assets.caption and are never scheduled.
@@ -31,3 +31,5 @@
 - Reel audio modes live in src/lib/reel-audio.ts: Meta's publishing API cannot pick Instagram music-library/trending sounds, so "Auto — Trending" modes publish the Reel's own/licensed audio; "Finish in Instagram" Reels get IG status needs_finish (never auto-sent) while Facebook still posts — never fake trending audio.
 - Camera-motion rating: the worker sends scene-score summaries with probe jobs, src/lib/motion.ts classifies them server-side (tested in src/test/motion.test.ts); flagged Reels are only skipped by an explicit owner action, never deleted — the thresholds are estimates.
 - Imports run from src/lib/import-store.ts (tab-wide store), not the Add batch page, so uploads survive page/business switches; the business is fixed when an import starts and dedupe is per business.
+
+- Meta connections are per (user, brand): meta_connection is keyed by brand_slug, checkMetaConnection takes the brand, and the publisher reads creds per asset brand — prevents one business posting to another's accounts.
