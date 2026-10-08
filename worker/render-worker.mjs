@@ -40,7 +40,7 @@ async function download(url, file) {
   await writeFile(file, Buffer.from(await r.arrayBuffer()));
 }
 
-async function probe(file, withMotion = true) {
+async function probe(file, withMotion = true, onProgress) {
   const { out } = await run("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", file]);
   const j = JSON.parse(out);
   const v = j.streams.find((s) => s.codec_type === "video");
@@ -57,7 +57,7 @@ async function probe(file, withMotion = true) {
   }
   let motion = null;
   if (v && withMotion) {
-    try { motion = await analyzeMotion(file); } catch (e) { console.error("motion check failed", e.message); }
+    try { motion = await analyzeMotion(file, Number(j.format.duration), onProgress); } catch (e) { console.error("motion check failed", e.message); }
   }
   return {
     motion,
@@ -68,8 +68,18 @@ async function probe(file, withMotion = true) {
 }
 
 /** Scene-change scores at 8 fps on a small copy; summary mirrors src/lib/motion.ts summarizeScores. */
-async function analyzeMotion(file) {
-  const { out } = await run("ffmpeg", ["-hide_banner", "-nostats", "-i", file, "-an", "-vf", "fps=8,scale=192:-2,select='gte(scene,0)',metadata=print:file=-", "-f", "null", "-"]);
+async function analyzeMotion(file, duration, onProgress) {
+  let lastProgress = 0;
+  const { out } = await run("ffmpeg", ["-hide_banner", "-nostats", "-i", file, "-an", "-vf", "fps=8,scale=192:-2,select='gte(scene,0)',metadata=print:file=-", "-progress", "pipe:2", "-f", "null", "-"], (line) => {
+    const matches = [...line.matchAll(/out_time_ms=(\d+)/g)];
+    const latest = matches.at(-1);
+    if (!latest || !duration) return;
+    const percent = Math.min(95, Math.max(10, Math.round((Number(latest[1]) / 1_000_000 / duration) * 90) + 10));
+    if (percent >= lastProgress + 2) {
+      lastProgress = percent;
+      onProgress?.(percent);
+    }
+  });
   const scores = [...out.matchAll(/lavfi\.scene_score=([\d.]+)/g)].map((m) => Number(m[1]));
   const n = scores.length;
   if (!n) return { frames: 0, mean: 0, p90: 0, jitter: 0, fast_share: 0 };
@@ -86,7 +96,13 @@ async function handle(job) {
     const src = join(dir, "src.mp4");
     await download(job.source_url, src);
     if (job.mode === "probe") {
-      return api("update", { job_id: job.id, status: "completed", verification: await probe(src) });
+      await api("update", { job_id: job.id, status: "processing", progress: 5 });
+      let progressUpdates = Promise.resolve();
+      const verification = await probe(src, true, (progress) => {
+        progressUpdates = progressUpdates.then(() => api("update", { job_id: job.id, status: "processing", progress }));
+      });
+      await progressUpdates;
+      return api("update", { job_id: job.id, status: "completed", verification });
     }
     if (!job.track_url) throw new Error("No music track");
     const music = join(dir, "music");

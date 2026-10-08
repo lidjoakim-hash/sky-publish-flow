@@ -34,6 +34,7 @@ describe("render progress display", () => {
     expect(renderJobLabel(job("queued", "queued", 42))).toBe("Queued · 0%");
     expect(renderJobPercent(job("active", "processing", 100))).toBe(99);
     expect(renderJobLabel(job("active", "processing", 64))).toBe("Rendering · 64%");
+    expect(renderJobLabel(job("camera", "processing", 64), "Analyzing")).toBe("Analyzing · 64%");
     expect(renderJobPercent(job("done", "completed", 95))).toBe(100);
     expect(renderJobLabel(job("done", "completed", 95))).toBe("Completed");
     expect(renderJobPercent(job("failed", "failed", 37))).toBe(37);

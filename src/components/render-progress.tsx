@@ -3,7 +3,7 @@ import { Check, Clock3, LoaderCircle, TriangleAlert } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { formatRenderEta, observeRenderProgress, renderJobLabel, renderJobPercent, summarizeRenderProgress, type ProgressJob, type ProgressSample } from "@/lib/render-progress";
 
-export function RenderProgress({ jobs, loading, error }: { jobs: ProgressJob[]; loading?: boolean; error?: boolean }) {
+export function RenderProgress({ jobs, loading, error, purpose = "render" }: { jobs: ProgressJob[]; loading?: boolean; error?: boolean; purpose?: "render" | "camera" }) {
   const samples = useRef(new Map<string, ProgressSample>());
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -16,7 +16,8 @@ export function RenderProgress({ jobs, loading, error }: { jobs: ProgressJob[]; 
   }, []);
   const summary = summarizeRenderProgress(jobs, samples.current, now);
   const active = !summary.settled || loading;
-  const heading = loading ? "Preparing your render queue…" : summary.settled ? "Rendering finished" : summary.processing ? "Rendering your Reels" : "Waiting for render worker";
+  const camera = purpose === "camera";
+  const heading = loading ? (camera ? "Preparing camera checks…" : "Preparing your render queue…") : summary.settled ? (camera ? "Camera checks finished" : "Rendering finished") : summary.processing ? (camera ? "Analyzing camera movement" : "Rendering your Reels") : "Waiting for render worker";
   return (
     <section aria-label="Rendering progress" className="render-progress-panel mt-4 border-t pt-4">
       <div className="flex items-center gap-4">
@@ -30,12 +31,12 @@ export function RenderProgress({ jobs, loading, error }: { jobs: ProgressJob[]; 
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-sm font-semibold">{active ? <LoaderCircle className="size-4 shrink-0 motion-safe:animate-spin text-teal" /> : <Check className="size-4 shrink-0 text-success" />}<span>{heading}</span></div>
-          <p className="mt-1 text-xs text-muted-foreground">{summary.done} of {jobs.length} Reels completed</p>
+           <p className="mt-1 text-xs text-muted-foreground">{summary.done} of {jobs.length} Reels {camera ? "checked" : "completed"}</p>
           <div className="mt-2 flex items-center gap-1.5 text-xs"><Clock3 className="size-3.5 shrink-0 text-teal" /><span>Estimated remaining: <strong>{error ? "Unavailable" : loading || !summary.settled && !summary.processing ? "Waiting for worker" : summary.stale ? "Waiting for progress update" : formatRenderEta(summary.estimatedMs)}</strong></span></div>
         </div>
       </div>
       <div className="relative mt-4 overflow-hidden rounded-full"><Progress value={summary.percent} className="h-2.5 [&>div]:bg-teal [&>div]:duration-1000" />{active && summary.processing > 0 && <div className="render-bar-shimmer pointer-events-none absolute inset-0 bg-teal/20" />}</div>
-      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"><span>{summary.processing} rendering</span><span>{summary.queued} queued</span>{summary.failed > 0 && <span className="text-destructive">{summary.failed} failed</span>}{summary.cancelled > 0 && <span>{summary.cancelled} cancelled</span>}</div>
+       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"><span>{summary.processing} {camera ? "analyzing" : "rendering"}</span><span>{summary.queued} queued</span>{summary.failed > 0 && <span className="text-destructive">{summary.failed} failed</span>}{summary.cancelled > 0 && <span>{summary.cancelled} cancelled</span>}</div>
       {jobs.length > 0 && (
         <div className="mt-4 max-h-72 space-y-3 overflow-y-auto border-t pt-3" aria-label="Progress for each Reel">
           {jobs.map((job) => {
@@ -45,9 +46,9 @@ export function RenderProgress({ jobs, loading, error }: { jobs: ProgressJob[]; 
               <div key={job.id} className="space-y-1.5">
                 <div className="flex items-center justify-between gap-3 text-xs">
                   <span className="min-w-0 truncate font-medium">{job.file_name ?? "Reel"}</span>
-                  <span className={failed ? "shrink-0 text-destructive" : "shrink-0 tabular-nums text-muted-foreground"}>{renderJobLabel(job)}</span>
+                   <span className={failed ? "shrink-0 text-destructive" : "shrink-0 tabular-nums text-muted-foreground"}>{renderJobLabel(job, camera ? "Analyzing" : "Rendering")}</span>
                 </div>
-                <Progress value={percent} aria-label={`${job.file_name ?? "Reel"} render progress`} className="h-2 [&>div]:bg-teal [&>div]:duration-1000" />
+                 <Progress value={percent} aria-label={`${job.file_name ?? "Reel"} ${camera ? "camera check" : "render"} progress`} className="h-2 [&>div]:bg-teal [&>div]:duration-1000" />
               </div>
             );
           })}
