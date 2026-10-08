@@ -16,8 +16,7 @@
 - Publishing is a per-(asset, platform) state machine in src/lib/publisher.server.ts, claimed via the claim_publications DB lease; intent is persisted before each Meta write and interrupted sends become "unknown" — prevents double posts.
 - publications and meta_connection are written only server-side (admin client); clients can only read them — status cannot be faked from the browser.
 - FFmpeg probing/rendering runs in the local worker (worker/render-worker.mjs) via /api/public/worker/* guarded by WORKER_SECRET; originals in storage are never overwritten, and deleted only by the owner-initiated deleteAssets server function (no storage delete policy for clients).
-- Meta credentials are server secrets (META_PAGE_ACCESS_TOKEN, META_PAGE_ID, META_IG_USER_ID, optional META_GRAPH_VERSION), never stored in the database or browser.
-- The cron route /api/public/cron/publish uses authenticateCronRequest; the cron job is created only when the user first activates publishing.
+- Meta credentials are server secrets, never stored in the database or browser.
 - Strategy rules (bucket vocabulary, keyword suggestions, source grouping) live in src/lib/strategy.ts; the strategy-aware planner is src/lib/planner.ts, wrapped by planWithStrategy in src/lib/plan.ts and covered by src/test/strategy-rules.test.ts — keeps rotation/cooldown/lock behaviour testable.
 - Calendar plans are previewed client-side; commitSchedule recomputes the plan from persisted data and refuses stale previews, then writes via the commit_schedule DB function (one transaction, row locks, lease/lock/brand/collision checks, all-or-nothing) — the browser cannot bypass planning safeguards.
 - Assets carry brand_slug; planning, organizing, ideas and metrics are scoped per brand, and each brand posts only with its own Meta secrets (Skyline: META_*, others: META_<SLUG>_*, IG id only when Instagram is chosen), never falling back to another brand's — prevents posting one brand to another's accounts.
