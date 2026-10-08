@@ -367,6 +367,24 @@ export type Database = {
           },
         ]
       }
+      job_tokens: {
+        Row: {
+          created_at: string
+          name: string
+          secret: string
+        }
+        Insert: {
+          created_at?: string
+          name: string
+          secret: string
+        }
+        Update: {
+          created_at?: string
+          name?: string
+          secret?: string
+        }
+        Relationships: []
+      }
       meta_connection: {
         Row: {
           checked_at: string | null

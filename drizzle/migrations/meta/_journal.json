@@ -64,6 +64,13 @@
       "when": 1791349922955,
       "tag": "0008_asset_motion",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791471493099,
+      "tag": "0009_job_tick_token",
+      "breakpoints": true
     }
   ]
 }
