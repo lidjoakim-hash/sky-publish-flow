@@ -56,7 +56,7 @@ const PUB_LABEL: Record<string, [string, "success" | "warning" | "danger" | "tea
   retry: ["Will retry", "warning"],
   published: ["Published", "success"],
   failed: ["Failed", "danger"],
-  unknown: ["Needs review", "warning"],
+  unknown: ["Needs your check", "warning"],
   skipped: ["Skipped", "muted"],
 };
 
