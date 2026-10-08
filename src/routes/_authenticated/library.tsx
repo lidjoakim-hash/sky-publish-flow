@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Activity, CalendarCheck, CalendarPlus, Download, Eye, EyeOff, Film, Image as ImageIcon, Pencil, Wand2 } from "lucide-react";
+import { Activity, CalendarCheck, CalendarPlus, Download, Eye, EyeOff, Film, Image as ImageIcon, Pencil, Trash2, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +17,7 @@ import { readiness } from "@/lib/readiness";
 import { metaIssues } from "@/lib/meta-format";
 import { isFlaggedMotion, MOTION_TEXT, type MotionLabel } from "@/lib/motion";
 import { AUDIO_MODES, AUDIO_MODE_LABEL, TRENDING_LIMITATION } from "@/lib/reel-audio";
+import { deleteAssets } from "@/lib/app.functions";
 import { RenderProgress } from "@/components/render-progress";
 
 export const Route = createFileRoute("/_authenticated/library")({
@@ -93,6 +94,14 @@ function LibraryPage() {
     const { error } = await supabase.from("assets").update({ skipped: true, approved: false, scheduled_at: null }).in("id", flagged.map((a) => a.id));
     if (error) toast.error(error.message);
     else toast.success(`Skipped ${flagged.length} Reels`);
+    qc.invalidateQueries({ queryKey: ["assets"] });
+  }
+
+  async function remove(a: Asset) {
+    if (!confirm(`Delete “${a.file_name}” permanently? The file and all its records are removed from the system. This cannot be undone.`)) return;
+    const res = await deleteAssets({ data: { ids: [a.id] } });
+    if (res.ok) toast.success(res.message);
+    else toast.error(res.message);
     qc.invalidateQueries({ queryKey: ["assets"] });
   }
 
@@ -203,6 +212,7 @@ function LibraryPage() {
                   <Button size="sm" variant="ghost" className="ml-auto" onClick={() => patch(a.id, { skipped: !a.skipped, approved: false })}>
                     <EyeOff /> {a.skipped ? "Unskip" : "Skip"}
                   </Button>
+                  <Button size="sm" variant="ghost" className="text-destructive" onClick={() => remove(a)}><Trash2 /> Delete</Button>
                 </div>
               </article>
             );
