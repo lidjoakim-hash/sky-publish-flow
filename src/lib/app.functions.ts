@@ -137,7 +137,7 @@ export const deleteAssets = createServerFn({ method: "POST" })
       .select("id, file_name, storage_path, cover_path, rendered_path")
       .in("id", data.ids);
     if (error) throw error;
-    if (!assets?.length) return { ok: false, message: "Nothing found to delete." };
+    if (!assets?.length) return { ok: false, deleted: 0, message: "Nothing found to delete." };
     const { supabaseAdmin: admin } = await import("@/integrations/supabase/client.server");
     const ids = assets.map((a) => a.id);
     // Only a send that is running right now (live lease) blocks deletion; stuck/unknown rows can be removed by the owner.
