@@ -216,10 +216,10 @@ export async function runImport(source: { kind: "files"; files: File[] } | { kin
   for (const p of plan.order) cb.onFile({ path: p, role: plan.roles.get(p)!, status: "queued" });
 
   // Existing state for resume + dedupe
-  const { data: existing } = await supabase.from("assets").select("id, sha256, rel_path, batch_id, upload_state");
+  const { data: existing } = await supabase.from("assets").select("id, sha256, rel_path, batch_id, upload_state, brand_slug");
   const doneInBatch = new Set((existing ?? []).filter((a) => a.batch_id === opts.batchId && a.upload_state === "done").map((a) => a.rel_path));
   // Only finished uploads count as duplicates, so files cut off by a refresh are uploaded again.
-  const shaSeen = new Set((existing ?? []).filter((a) => a.upload_state === "done" && (opts.allowRepeat ? a.batch_id === opts.batchId : true)).map((a) => a.sha256));
+  const shaSeen = new Set((existing ?? []).filter((a) => a.upload_state === "done" && a.brand_slug === opts.brandSlug && (opts.allowRepeat ? a.batch_id === opts.batchId : true)).map((a) => a.sha256));
   const coverByKey = new Map<string, string>();
   const reelIdByKey = new Map<string, string>();
   const orderIndex = new Map(plan.order.map((p, i) => [p, i]));
@@ -258,6 +258,7 @@ export async function runImport(source: { kind: "files"; files: File[] } | { kin
       .upsert(
         {
           batch_id: opts.batchId,
+          brand_slug: opts.brandSlug,
           rel_path: path,
           file_name: path.split("/").pop()!,
           kind: role,
