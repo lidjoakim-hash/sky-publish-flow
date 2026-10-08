@@ -1,4 +1,4 @@
-import { useBrandConnection } from "@/components/brand";
+import { useBrandConnection , useBrandAssets, useBrandPublications } from "@/components/brand";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -36,8 +36,8 @@ const dayLabel = (iso: string, today: string, tomorrow: string) => {
 };
 
 function NextPage() {
-  const { data: assets = [] } = useQuery({ ...assetsQuery, refetchInterval: 60000 });
-  const { data: pubs = [] } = useQuery(publicationsQuery);
+  const { data: assets = [] } = useBrandAssets({ refetchInterval: 60000 });
+  const { data: pubs = [] } = useBrandPublications();
   const [open, setOpen] = useState<Asset | null>(null);
   const now = Date.now();
   const today = osloDateKey(new Date());
