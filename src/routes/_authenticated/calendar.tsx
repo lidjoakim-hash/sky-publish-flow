@@ -166,7 +166,7 @@ function CalendarPage() {
           {settings?.publishing_active ? (
             <Button variant="outline" onClick={pause}><PauseCircle /> Pause publishing</Button>
           ) : (
-            <Button variant="hero" onClick={() => setConfirm(true)} disabled={!scheduled.length || slug !== "skyline"}><PlayCircle /> Activate</Button>
+            <Button variant="hero" onClick={() => setConfirm(true)} disabled={!scheduled.length}><PlayCircle /> Activate</Button>
           )}
         </>}
       />
