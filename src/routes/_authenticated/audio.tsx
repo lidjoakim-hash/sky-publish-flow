@@ -28,7 +28,8 @@ function AudioPage() {
   const qc = useQueryClient();
   const { data: assets = [] } = useBrandAssets();
   const { data: tracks = [] } = useQuery(tracksQuery);
-  const { data: jobs = [], isError: jobsError } = useQuery(jobsQuery);
+  const { data: allJobs = [], isError: jobsError } = useQuery(jobsQuery);
+  const jobs = allJobs.filter((j) => assets.some((a) => a.id === j.asset_id));
   const { data: settings } = useQuery(settingsQuery);
   async function setDefaultAudio(v: string) {
     const { data: u } = await supabase.auth.getUser();

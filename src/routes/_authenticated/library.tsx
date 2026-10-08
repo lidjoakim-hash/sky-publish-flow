@@ -31,7 +31,8 @@ type Filter = "all" | "reel" | "post" | "needs" | "skipped" | "seasonal" | "sche
 function LibraryPage() {
   const qc = useQueryClient();
   const { data: assets = [] } = useBrandAssets();
-  const { data: jobs = [], isError: jobsError } = useQuery(jobsQuery);
+  const { data: allJobs = [], isError: jobsError } = useQuery(jobsQuery);
+  const jobs = allJobs.filter((j) => assets.some((a) => a.id === j.asset_id));
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
   const [edit, setEdit] = useState<Asset | null>(null);
