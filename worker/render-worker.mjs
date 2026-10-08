@@ -97,7 +97,12 @@ async function handle(job) {
     await download(job.source_url, src);
     if (job.mode === "probe") {
       await api("update", { job_id: job.id, status: "processing", progress: 5 });
-      return api("update", { job_id: job.id, status: "completed", verification: await probe(src, true, (progress) => { void api("update", { job_id: job.id, status: "processing", progress }); }) });
+      let progressUpdates = Promise.resolve();
+      const verification = await probe(src, true, (progress) => {
+        progressUpdates = progressUpdates.then(() => api("update", { job_id: job.id, status: "processing", progress }));
+      });
+      await progressUpdates;
+      return api("update", { job_id: job.id, status: "completed", verification });
     }
     if (!job.track_url) throw new Error("No music track");
     const music = join(dir, "music");

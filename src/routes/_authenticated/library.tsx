@@ -35,6 +35,7 @@ function LibraryPage() {
   const [edit, setEdit] = useState<Asset | null>(null);
   const [preview, setPreview] = useState<{ a: Asset; url: string } | null>(null);
   const [motionJobIds, setMotionJobIds] = useState<string[]>([]);
+  const [motionCompletionKey, setMotionCompletionKey] = useState("");
   useEffect(() => {
     try {
       const saved: unknown = JSON.parse(sessionStorage.getItem("skyline-motion-progress") ?? "[]");
@@ -70,8 +71,12 @@ function LibraryPage() {
     return visible.map((job) => ({ ...job, file_name: names.get(job.asset_id) ?? "Reel" }));
   }, [assets, jobs, motionJobIds]);
   useEffect(() => {
-    if (motionJobs.some((job) => job.status === "completed")) qc.invalidateQueries({ queryKey: ["assets"] });
-  }, [motionJobs, qc]);
+    const completed = motionJobs.filter((job) => job.status === "completed").map((job) => job.id).sort().join(",");
+    if (completed && completed !== motionCompletionKey) {
+      setMotionCompletionKey(completed);
+      qc.invalidateQueries({ queryKey: ["assets"] });
+    }
+  }, [motionCompletionKey, motionJobs, qc]);
 
   async function checkMotion() {
     const { data, error } = await supabase.from("render_jobs").insert(unchecked.map((a) => ({ asset_id: a.id, mode: "probe" }))).select("id");
