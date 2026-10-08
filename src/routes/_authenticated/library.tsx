@@ -112,9 +112,11 @@ function LibraryPage() {
     if (typed !== "DELETE") { if (typed !== null) toast("Not deleted — the word did not match."); return; }
     let deleted = 0;
     for (let i = 0; i < assets.length; i += 100) {
-      const res = await deleteAssets({ data: { ids: assets.slice(i, i + 100).map((a) => a.id) } });
-      if (!res.ok) { toast.error(res.message); break; }
-      deleted += Math.min(100, assets.length - i);
+      try {
+        const res = await deleteAssets({ data: { ids: assets.slice(i, i + 100).map((a) => a.id) } });
+        deleted += res.deleted ?? 0;
+        if (!res.ok || res.message.includes("Kept")) toast(res.message);
+      } catch (e) { toast.error((e as Error).message); }
     }
     if (deleted) toast.success(`Deleted ${deleted} items permanently.`);
     qc.invalidateQueries({ queryKey: ["assets"] });
