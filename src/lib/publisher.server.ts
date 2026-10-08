@@ -37,6 +37,27 @@ export async function runPublisherTick(admin: Admin, owner: string, deadlineMs =
   for (const s of stuck ?? []) await alert(admin, s.user_id, "warning", "A post needs review: the outcome of a send is unknown.");
   report.reconciled = stuck?.length ?? 0;
 
+  // Half-finished sends: started at Meta ("processing") but the claim window has passed,
+  // so they would never be picked up again. Flag them for the owner instead of leaving them silent.
+  const cutoff = new Date(Date.now() - 3 * 3600_000).toISOString();
+  const { data: halfDone, error: he } = await admin
+    .from("publications")
+    .select("id, user_id, platform, lease_until, assets!inner(file_name, scheduled_at)")
+    .eq("status", "processing")
+    .lt("assets.scheduled_at", cutoff);
+  if (he) throw he;
+  const nowIso = new Date().toISOString();
+  for (const h of (halfDone ?? []) as unknown as { id: string; user_id: string; platform: string; lease_until: string | null; assets: { file_name: string } }[]) {
+    if (h.lease_until && h.lease_until > nowIso) continue;
+    const { data: upd } = await admin.from("publications")
+      .update({ status: "unknown", last_error: "Started but never finished on Meta; check the account — mark it live, or send again", lease_owner: null, lease_until: null, updated_at: nowIso })
+      .eq("id", h.id).eq("status", "processing").select("id");
+    if (upd?.length) {
+      await alert(admin, h.user_id, "warning", `${h.assets.file_name} (${h.platform === "instagram" ? "Instagram" : "Facebook"}) needs your check: it started posting but never finished.`);
+      report.reconciled++;
+    }
+  }
+
   // Slots older than the claim window become "missed" (never posted late), one alert per item.
   const { data: missed, error: me } = await admin.rpc("mark_missed_publications");
   if (me) throw me;
