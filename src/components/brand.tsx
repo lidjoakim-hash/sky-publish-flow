@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { ArrowDown, ArrowUp, Eye, EyeOff, Plus } from "lucide-react";
+import { ArrowDown, ArrowUp, Eye, Plus, Settings2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -45,12 +45,12 @@ export function BrandSwitcher() {
   return (
     <label className="flex items-center gap-2 text-sm">
       <span className="text-muted-foreground">Brand</span>
-      <select aria-label="Active brand" className={selectCls} value={slug} onChange={(e) => (e.target.value === "__manage" ? setOpen(true) : setSlug(e.target.value))}>
+      <select aria-label="Active brand" className={selectCls} value={slug} onChange={(e) => setSlug(e.target.value)}>
         {brands.map((b) => (
           <option key={b.slug} value={b.slug}>{b.name}</option>
         ))}
-        <option value="__manage">⚙ Manage businesses…</option>
       </select>
+      <Button size="icon" variant="ghost" aria-label="Manage businesses" title="Manage businesses" onClick={() => setOpen(true)}><Settings2 /></Button>
       <ManageBrands open={open} onOpenChange={setOpen} />
     </label>
   );
@@ -114,9 +114,11 @@ function ManageBrands({ open, onOpenChange }: { open: boolean; onOpenChange: (v:
               <Input defaultValue={b.name} aria-label={`Name of ${b.name}`} onBlur={(e) => rename(b, e.target.value)} className="h-9" />
               <Button size="icon" variant="ghost" aria-label="Move up" disabled={i === 0} onClick={() => move(i, -1)}><ArrowUp /></Button>
               <Button size="icon" variant="ghost" aria-label="Move down" disabled={i === list.length - 1} onClick={() => move(i, 1)}><ArrowDown /></Button>
-              <Button size="icon" variant="ghost" aria-label={meta(b).hidden ? "Show in list" : "Remove from list"} title={meta(b).hidden ? "Show in list" : "Remove from list"} onClick={() => toggleHidden(b)}>
-                {meta(b).hidden ? <Eye /> : <EyeOff />}
-              </Button>
+              {meta(b).hidden ? (
+                <Button size="icon" variant="ghost" aria-label="Show in list" title="Show in list" onClick={() => toggleHidden(b)}><Eye /></Button>
+              ) : (
+                <Button size="icon" variant="ghost" aria-label={`Remove ${b.name} from list`} title="Remove from list (keeps its uploads)" onClick={() => toggleHidden(b)}><X /></Button>
+              )}
               {b.slug === slug && <span className="text-xs text-muted-foreground">current</span>}
             </li>
           ))}
