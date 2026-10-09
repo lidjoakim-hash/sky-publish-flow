@@ -81,7 +81,7 @@ function StrategyPage() {
           <div className="space-y-3 text-sm">
             <div className="rounded-lg bg-muted p-3">
               <div className="font-medium">Current daily schedule (Calendar)</div>
-              <div className="text-muted-foreground">Image posts: {(settings?.post_times ?? []).map((t) => t.slice(0, 5)).join(", ")} · Reel: {settings?.reel_time?.slice(0, 5)} · {settings?.timezone}</div>
+              <div className="text-muted-foreground">Image posts: {(s.schedule?.postTimes ?? settings?.post_times ?? []).map((t) => t.slice(0, 5)).join(", ")} · Reels: {(s.schedule?.reelTimes ?? [settings?.reel_time ?? ""]).map((t) => t.slice(0, 5)).join(", ")} · {settings?.timezone}</div>
             </div>
             <label className="flex items-center justify-between gap-2">
               <span><span className="font-medium">Quality-first preset</span><br /><span className="text-xs text-muted-foreground">Fewer, better-spaced posts. Only used by new plans you preview in the Calendar.</span></span>

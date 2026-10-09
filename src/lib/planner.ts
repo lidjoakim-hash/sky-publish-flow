@@ -59,7 +59,7 @@ export function strategyPlan(items: PlanItem[], o: StrategyPlanOptions): Strateg
   const held: Held[] = [];
   const w = (b: string | null) => Math.max(0, o.weights?.[b ?? UNCLASSIFIED] ?? 1);
   const pools = { post: items.filter((i) => i.kind === "post"), reel: items.filter((i) => i.kind === "reel") };
-  const postTimes = o.postTimes.length ? o.postTimes : ["18:00"];
+  const postTimes = o.postTimes.length || o.reelTimes ? o.postTimes : ["18:00"];
   const allReel = o.reelTimes ?? [o.reelTime];
   const reelTimes = allReel.slice(0, Math.max(0, o.reelsPerDay ?? allReel.length));
   if (!reelTimes.length) {
