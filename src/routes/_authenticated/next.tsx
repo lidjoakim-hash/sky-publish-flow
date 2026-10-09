@@ -68,7 +68,10 @@ function NextPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="font-display text-2xl font-bold sm:text-3xl">Up next</h1>
+      <div className="flex items-baseline justify-between gap-2">
+        <h1 className="font-display text-2xl font-bold sm:text-3xl">Up next</h1>
+        <Link to="/health" className="text-sm font-medium text-primary underline">Check all businesses</Link>
+      </div>
 
       <div className={cn("mt-4 rounded-2xl border p-4 shadow-card", run.days <= 7 ? "border-warning bg-warning/10" : "bg-card")}>
         <div className="flex items-baseline gap-2">
