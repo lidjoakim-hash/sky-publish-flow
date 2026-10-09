@@ -85,6 +85,13 @@
       "when": 1791480464757,
       "tag": "0011_brand_publishing_switches",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791565412120,
+      "tag": "0012_commit_schedule_per_brand",
+      "breakpoints": true
     }
   ]
 }

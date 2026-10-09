@@ -73,11 +73,11 @@ const asset = (id: string, p: Partial<Asset> = {}): Asset => ({ id, user_id: "u"
 
 describe("brand boundaries and locks", () => {
   const input = (assets: Asset[], pubs: Publication[] = []) => ({ assets, pubs, startDate: "2026-11-02", postTimes: ["09:00"], reelTime: "19:00", timeZone: "Europe/Oslo", topicMixing: false, mode: "reschedule" as const, brand: "skyline", strategy: {}, now: new Date("2026-11-01T00:00:00Z") });
-  it("only plans the selected brand and treats other brands' slots as taken", () => {
+  it("only plans the selected brand; other brands' dates never push the start later", () => {
     const v = asset("v", { brand_slug: "velune", scheduled_at: "2026-11-02T08:00:00.000Z" });
     const r = planWithStrategy(input([asset("s"), v]));
     expect(r.assignments.has("v")).toBe(false);
-    expect(Math.abs(new Date(r.assignments.get("s")!).getTime() - Date.parse("2026-11-03T08:00:00.000Z"))).toBeLessThanOrEqual(5 * 60_000); // next free slot, ±5 min jitter
+    expect(Math.abs(new Date(r.assignments.get("s")!).getTime() - Date.parse("2026-11-02T08:00:00.000Z"))).toBeLessThanOrEqual(5 * 60_000); // starts on the chosen day, ±5 min jitter
   });
   it("keeps locked items and holds rejected ones with a reason", () => {
     const locked = asset("l", { scheduled_at: "2026-11-05T08:00:00.000Z" });
