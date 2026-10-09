@@ -74,14 +74,19 @@ export function planWithStrategy(i: StrategyPlanInput): StrategyPlanResult {
     .map((a) => ({ at: new Date(a.scheduled_at!).toISOString(), kind: a.kind as "post" | "reel", bucket: a.bucket, sourceGroup: sourceGroupOf(a), hook: a.hooks?.[0] ?? null }));
   const ordered = [...moving].sort((a, b) => Number(b.campaign_first) - Number(a.campaign_first) || a.sort_index - b.sort_index);
   const q = i.strategy.qualityPreset?.enabled ? i.strategy.qualityPreset : null;
-  const postTimes = i.postTimes.map((t) => t.slice(0, 5)).slice(0, q ? Math.max(0, q.postsPerDay) : undefined);
+  // A business's own times (Strategy/Calendar) win over the shared defaults.
+  const own = i.strategy.schedule;
+  const basePosts = own ? own.postTimes : i.postTimes;
+  const reelTimes = (own ? own.reelTimes : [i.reelTime]).map((t) => t.slice(0, 5));
+  const postTimes = basePosts.map((t) => t.slice(0, 5)).slice(0, q ? Math.max(0, q.postsPerDay) : undefined);
   const res = strategyPlan(
     ordered.map((a) => ({ id: a.id, kind: a.kind as "post" | "reel", bucket: a.bucket, sourceGroup: sourceGroupOf(a), hook: a.hooks?.[0] ?? null, campaignFirst: a.campaign_first })),
     {
       startDate: i.startDate,
       postTimes,
       reelTime: i.reelTime.slice(0, 5),
-      reelsPerDay: q ? q.reelsPerDay : 1,
+      reelTimes,
+      reelsPerDay: q ? q.reelsPerDay : reelTimes.length,
       timeZone: i.timeZone,
       taken,
       notBefore: now,
