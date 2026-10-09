@@ -224,3 +224,33 @@ export const deleteAssets = createServerFn({ method: "POST" })
     const extra = kept.length ? ` Kept ${kept.length} that are sending right now: ${kept.join(", ")}.` : "";
     return { ok: true, deleted: doomed.length, message: `Deleted ${doomed.length} item${doomed.length === 1 ? "" : "s"} permanently.${extra}` };
   });
+
+/**
+ * Dry run for one business: resolves business → connection mode → account → platforms and checks the readiness
+ * of its next dated items. Makes ZERO Meta calls and writes nothing (no queue, no status). Not proof of live posting.
+ */
+export const dryRunBrand = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { brand: string }) => {
+    if (!d || !SLUG.test(d.brand)) throw new Error("Invalid business");
+    return d;
+  })
+  .handler(async ({ context, data }) => {
+    const { buildDryRun } = await import("./dry-run");
+    const { connectionMode, requiredSecrets, DEFAULT_PLATFORMS } = await import("./brand-publishing");
+    const { supabase } = context;
+    const brand = data.brand;
+    const [{ data: bp }, { data: conn }, { data: st }, { data: assets }] = await Promise.all([
+      supabase.from("brand_publishing").select("platforms, enabled").eq("brand_slug", brand).maybeSingle(),
+      supabase.from("meta_connection").select("status, ig_username, ig_user_id, page_name").eq("brand_slug", brand).maybeSingle(),
+      supabase.from("settings").select("publishing_active, timezone").maybeSingle(),
+      supabase.from("assets").select("*").eq("brand_slug", brand).eq("skipped", false).not("scheduled_at", "is", null).gt("scheduled_at", new Date().toISOString()).order("scheduled_at").limit(10),
+    ]);
+    const platforms = bp?.platforms?.length ? bp.platforms : (DEFAULT_PLATFORMS[brand] ?? []);
+    // Secret presence only (booleans) — values never leave the server.
+    const secretsPresent = Object.fromEntries(requiredSecrets(brand, platforms).map((n) => [n, !!process.env[n]]));
+    return buildDryRun({
+      brand, mode: connectionMode(brand), platforms, enabled: !!bp?.enabled, globalActive: !!st?.publishing_active,
+      timeZone: st?.timezone ?? "Europe/Oslo", connection: conn ?? null, secretsPresent, assets: (assets ?? []) as never,
+    });
+  });
