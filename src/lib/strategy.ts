@@ -37,7 +37,7 @@ export interface BrandStrategy {
   diversityFloor?: number;
 }
 
-export const DEFAULT_STRATEGY: Required<Omit<BrandStrategy, "weights" | "qualityPreset">> = {
+export const DEFAULT_STRATEGY: Required<Omit<BrandStrategy, "weights" | "qualityPreset" | "schedule">> = {
   cooldownDays: 2,
   minSample: 5,
   maxStep: 0.2,
