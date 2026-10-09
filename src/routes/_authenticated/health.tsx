@@ -4,6 +4,7 @@ import { CheckCircle2, AlertTriangle } from "lucide-react";
 import { assetsQuery, brandPublishingQuery, brandsQuery, connectionQuery, publicationsQuery, settingsQuery } from "@/lib/queries";
 import { brandHealth } from "@/lib/health";
 import { cn } from "@/lib/utils";
+import { visibleBrands } from "@/components/brand";
 
 export const Route = createFileRoute("/_authenticated/health")({
   head: () => ({
@@ -30,7 +31,7 @@ function HealthPage() {
   const { data: bp = [] } = useQuery({ ...brandPublishingQuery, ...opt });
   const { data: settings } = useQuery({ ...settingsQuery, ...opt });
   const now = Date.now();
-  const rows = brands.map((b) => {
+  const rows = visibleBrands(brands).map((b) => {
     const row = bp.find((r) => r.brand_slug === b.slug);
     const conn = Array.isArray(conns) ? conns.find((c) => c.brand_slug === b.slug) : undefined;
     return { name: b.name, h: brandHealth(b.slug, assets, pubs, { connected: conn?.status === "connected", postingOn: !!settings?.publishing_active && !!row?.enabled, now }) };
