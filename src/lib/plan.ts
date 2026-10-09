@@ -66,7 +66,8 @@ export function planWithStrategy(i: StrategyPlanInput): StrategyPlanResult {
     return true;
   });
   const movingIds = new Set(moving.map((a) => a.id));
-  const fixed = i.assets.filter((a) => a.scheduled_at && !movingIds.has(a.id));
+  // Only this business's own dates occupy slots — other businesses post to different accounts.
+  const fixed = brandAssets.filter((a) => a.scheduled_at && !movingIds.has(a.id));
   const taken = new Set(fixed.map((a) => new Date(a.scheduled_at!).toISOString()));
   const history: HistoryEntry[] = fixed
     .filter((a) => (a.brand_slug ?? "skyline") === i.brand)
