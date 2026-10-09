@@ -18,6 +18,19 @@ export function validateDailyTimes(postTimes: string[], reelTime: string): strin
   return null;
 }
 
+/** Per-business daily times: any number of posts and Reels, each HH:MM, ascending, no time used twice. */
+export function validateBrandTimes(postTimes: string[], reelTimes: string[]): string | null {
+  if (!postTimes.length && !reelTimes.length) return "Add at least one post or Reel time.";
+  if (postTimes.length > 12 || reelTimes.length > 6) return "At most 12 posts and 6 Reels a day.";
+  for (const [list, name] of [[postTimes, "Post"], [reelTimes, "Reel"]] as const)
+    for (let i = 0; i < list.length; i++) {
+      if (!HHMM.test(list[i]!)) return `${name} time "${list[i]}" must be HH:MM.`;
+      if (i > 0 && list[i]! <= list[i - 1]!) return `${name} times must be different and in order (earliest first).`;
+    }
+  const clash = postTimes.find((t) => reelTimes.includes(t));
+  return clash ? `${clash} is used for both a post and a Reel.` : null;
+}
+
 /** Publication statuses that may still be (re)planned. Anything else is locked. */
 export const REPLANNABLE = ["pending", "retry", "skipped", "missed"] as const;
 

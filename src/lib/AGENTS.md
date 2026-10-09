@@ -8,3 +8,4 @@
 - Camera-motion rating: the worker sends scene-score summaries with probe jobs, src/lib/motion.ts classifies them server-side (tested in src/test/motion.test.ts); flagged Reels are only skipped by an explicit owner action, never deleted — the thresholds are estimates.
 - Imports run from src/lib/import-store.ts (tab-wide store), not the Add batch page, so uploads survive page/business switches; the business is fixed when an import starts and dedupe is per business.
 - Dry runs (src/lib/dry-run.ts via dryRunBrand) make zero Meta calls and write nothing; they are never proof of live posting.
+- Each business may store its own daily post/Reel times in brands.strategy.schedule; planWithStrategy prefers them over settings, so the Calendar preview and commitSchedule use identical times.

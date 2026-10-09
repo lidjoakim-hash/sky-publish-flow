@@ -30,12 +30,14 @@ export interface BrandStrategy {
   cooldownDays?: number;
   /** Quality-first preset: daily caps and minimum spacing. Only used when enabled explicitly. */
   qualityPreset?: { enabled: boolean; postsPerDay: number; reelsPerDay: number; minSpacingHours: number };
+  /** This business's own daily posting times (Oslo). Missing = the shared defaults from settings. */
+  schedule?: { postTimes: string[]; reelTimes: string[] };
   minSample?: number;
   maxStep?: number;
   diversityFloor?: number;
 }
 
-export const DEFAULT_STRATEGY: Required<Omit<BrandStrategy, "weights" | "qualityPreset">> = {
+export const DEFAULT_STRATEGY: Required<Omit<BrandStrategy, "weights" | "qualityPreset" | "schedule">> = {
   cooldownDays: 2,
   minSample: 5,
   maxStep: 0.2,

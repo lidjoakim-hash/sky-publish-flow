@@ -24,7 +24,7 @@ import { BrandSwitcher, useActiveBrand, useBrandConnection , useBrandAssets, use
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { readiness } from "@/lib/readiness";
 import { activatePublishing } from "@/lib/app.functions";
-import { validateDailyTimes } from "@/lib/publishing-rules";
+import { validateBrandTimes } from "@/lib/publishing-rules";
 
 export const Route = createFileRoute("/_authenticated/calendar")({
   validateSearch: (s: Record<string, unknown>): { plan?: "new" } => (s.plan === "new" ? { plan: "new" } : {}),
@@ -46,25 +46,29 @@ function CalendarPage() {
   const { data: conn } = useBrandConnection();
   const activate = useServerFn(activatePublishing);
   const commit = useServerFn(commitSchedule);
-  const { slug, strategy } = useActiveBrand();
+  const { slug, strategy, brand } = useActiveBrand();
   const [preview, setPreview] = useState<(StrategyPlanResult & { mode: "append" | "reschedule" | "missed"; startDate: string }) | null>(null);
   const tomorrow = addDays(osloDateKey(new Date()), 1);
   const [start, setStart] = useState(tomorrow);
   const [postTimes, setPostTimes] = useState<string[]>(["09:00", "13:00", "18:00"]);
-  const [reelTime, setReelTime] = useState("19:00");
+  const [reelTimes, setReelTimes] = useState<string[]>(["19:00"]);
   const [mixing, setMixing] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [month, setMonth] = useState(osloDateKey(new Date()).slice(0, 7));
   const [ready, setReady] = useState(false);
+  // Each business has its own daily times; until set, it uses the shared defaults.
+  const effectivePosts = (strategy.schedule?.postTimes ?? (settings?.post_times?.length ? settings.post_times : settings ? [settings.post_time] : [])).map((t) => t.slice(0, 5));
+  const effectiveReels = (strategy.schedule?.reelTimes ?? (settings ? [settings.reel_time] : [])).map((t) => t.slice(0, 5));
 
   useEffect(() => {
     if (!settings) return;
     if (settings.start_date && settings.start_date > osloDateKey(new Date())) setStart(settings.start_date);
-    setPostTimes((settings.post_times?.length ? settings.post_times : [settings.post_time]).map((t) => t.slice(0, 5)));
-    setReelTime(settings.reel_time.slice(0, 5));
+    setPostTimes(effectivePosts);
+    setReelTimes(effectiveReels);
     setMixing(settings.topic_mixing);
     setReady(true);
-  }, [settings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings, slug, strategy.schedule]);
 
   // Coming from Library's "Schedule new items": open the preview (nothing is saved until confirmed).
   useEffect(() => {
@@ -74,8 +78,7 @@ function CalendarPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search.plan, ready, assets.length]);
 
-  const effectivePosts = (settings?.post_times ?? []).map((t) => t.slice(0, 5));
-  const effectiveReel = settings?.reel_time?.slice(0, 5) ?? "—";
+
   const scheduled = useMemo(() => assets.filter((a) => a.scheduled_at && !a.skipped && a.brand_slug === slug).sort((a, b) => a.scheduled_at!.localeCompare(b.scheduled_at!)), [assets]);
   const pubBy = useMemo(() => {
     const m = new Map<string, Record<string, string>>();
@@ -90,10 +93,17 @@ function CalendarPage() {
 
   async function saveSettings(): Promise<boolean> {
     if (!settings) return false;
-    const bad = validateDailyTimes(postTimes, reelTime);
+    const p = [...postTimes].sort(), r = [...reelTimes].sort();
+    const bad = validateBrandTimes(p, r);
     if (bad) { toast.error(bad); return false; }
-    const { error } = await supabase.from("settings").update({ start_date: start, post_times: postTimes, post_time: postTimes[0] ?? "18:00", reel_time: reelTime, topic_mixing: mixing, updated_at: new Date().toISOString() }).eq("user_id", settings.user_id);
-    if (error) { toast.error(`Times not saved: ${error.message}`); return false; }
+    const { error } = await supabase.from("settings").update({ start_date: start, topic_mixing: mixing, updated_at: new Date().toISOString() }).eq("user_id", settings.user_id);
+    if (error) { toast.error(`Settings not saved: ${error.message}`); return false; }
+    if (!brand) { toast.error("Business not loaded yet."); return false; }
+    const next = { ...strategy, schedule: { postTimes: p, reelTimes: r } };
+    const { error: be } = await supabase.from("brands").update({ strategy: next as never, updated_at: new Date().toISOString() }).eq("id", brand.id);
+    if (be) { toast.error(`Times not saved: ${be.message}`); return false; }
+    setPostTimes(p); setReelTimes(r);
+    await qc.invalidateQueries({ queryKey: ["brands"] });
     qc.invalidateQueries({ queryKey: ["settings"] });
     return true;
   }
@@ -101,7 +111,7 @@ function CalendarPage() {
   async function apply(mode: "append" | "reschedule" | "missed") {
     if (start <= osloDateKey(new Date()) && mode !== "missed") return toast.error("Choose a future start date.");
     if (!(await saveSettings())) return;
-    const res = planWithStrategy({ assets: allAssets, pubs: allPubs, startDate: mode === "missed" ? tomorrow : start, postTimes, reelTime, timeZone: settings?.timezone ?? "Europe/Oslo", topicMixing: mixing, mode, brand: slug, strategy });
+    const res = planWithStrategy({ assets: allAssets, pubs: allPubs, startDate: mode === "missed" ? tomorrow : start, postTimes, reelTime: reelTimes[0] ?? "19:00", timeZone: settings?.timezone ?? "Europe/Oslo", topicMixing: mixing, mode, brand: slug, strategy: { ...strategy, schedule: { postTimes: [...postTimes].sort(), reelTimes: [...reelTimes].sort() } } });
     if (!res.assignments.size && !res.held.length) return toast("Nothing to schedule.");
     setPreview({ ...res, mode, startDate: start });
   }
@@ -164,7 +174,7 @@ function CalendarPage() {
     <div className="mx-auto max-w-6xl">
       <PageHeader
         title="Calendar"
-        subtitle={`Every day: image posts at ${effectivePosts.join(", ") || "—"} · Reel at ${effectiveReel} (${settings?.timezone ?? "Europe/Oslo"}, follows summer/winter time). Assign dates, review once, then activate.`}
+        subtitle={`Every day for this business: ${effectivePosts.length} image posts at ${effectivePosts.join(", ") || "—"} · ${effectiveReels.length} Reels at ${effectiveReels.join(", ") || "—"} (${settings?.timezone ?? "Europe/Oslo"}, follows summer/winter time). Assign dates, review once, then activate.`}
         actions={<>
           <BrandSwitcher />
           {settings?.publishing_active ? (
@@ -182,24 +192,12 @@ function CalendarPage() {
               <Input id="sd" type="date" min={tomorrow} value={start} onChange={(e) => setStart(e.target.value)} className="h-11" />
             </div>
             <div className="space-y-1.5">
-              <Label>Image posts (3 a day)</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {postTimes.map((t, i) => (
-                  <Input
-                    key={i}
-                    type="time"
-                    aria-label={`Image post ${i + 1}`}
-                    value={t}
-                    onChange={(e) => setPostTimes(postTimes.map((x, j) => (j === i ? e.target.value : x)))}
-                    className="h-11"
-                  />
-                ))}
-              </div>
+              <TimesEditor label="Image posts" what="Image post" list={postTimes} set={setPostTimes} max={12} fallback="12:00" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="rt">Reel (1 a day)</Label>
-              <Input id="rt" type="time" value={reelTime} onChange={(e) => setReelTime(e.target.value)} className="h-11" />
+              <TimesEditor label="Reels" what="Reel" list={reelTimes} set={setReelTimes} max={6} fallback="20:00" />
             </div>
+            <p className="text-xs text-muted-foreground">These times apply only to the business picked at the top left. They're saved when you press a plan button.</p>
             <label className="flex items-center justify-between gap-2 text-sm">
               <span>Mix topics (from file names and your tags)</span>
               <Switch checked={mixing} onCheckedChange={setMixing} />
@@ -328,5 +326,24 @@ function PlanPreview({ preview, assets, onCancel, onCommit }: { preview: (Strate
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function TimesEditor({ label, what, list, set, max, fallback }: { label: string; what: string; list: string[]; set: (v: string[]) => void; max: number; fallback: string }) {
+  return (
+    <>
+      <div className="flex items-center justify-between">
+        <Label>{label} ({list.length} a day)</Label>
+        <div className="flex gap-1">
+          <Button type="button" size="sm" variant="outline" aria-label={`Remove a ${what.toLowerCase()} time`} disabled={!list.length} onClick={() => set(list.slice(0, -1))}>−</Button>
+          <Button type="button" size="sm" variant="outline" aria-label={`Add a ${what.toLowerCase()} time`} disabled={list.length >= max} onClick={() => set([...list, fallback])}>+</Button>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {list.map((t, i) => (
+          <Input key={i} type="time" aria-label={`${what} ${i + 1}`} value={t} onChange={(e) => set(list.map((x, j) => (j === i ? e.target.value : x)))} className="h-11" />
+        ))}
+      </div>
+    </>
   );
 }

@@ -26,6 +26,8 @@ export interface StrategyPlanOptions {
   postTimes: string[];
   reelTime: string;
   reelsPerDay?: number;
+  /** Several daily Reel times; overrides reelTime when given. */
+  reelTimes?: string[];
   timeZone?: string;
   taken: Set<string>;
   notBefore: Date;
@@ -57,10 +59,11 @@ export function strategyPlan(items: PlanItem[], o: StrategyPlanOptions): Strateg
   const held: Held[] = [];
   const w = (b: string | null) => Math.max(0, o.weights?.[b ?? UNCLASSIFIED] ?? 1);
   const pools = { post: items.filter((i) => i.kind === "post"), reel: items.filter((i) => i.kind === "reel") };
-  const postTimes = o.postTimes.length ? o.postTimes : ["18:00"];
-  const reelTimes = (o.reelsPerDay ?? 1) > 0 ? [o.reelTime] : [];
+  const postTimes = o.postTimes.length || o.reelTimes ? o.postTimes : ["18:00"];
+  const allReel = o.reelTimes ?? [o.reelTime];
+  const reelTimes = allReel.slice(0, Math.max(0, o.reelsPerDay ?? allReel.length));
   if (!reelTimes.length) {
-    for (const p of pools.reel) held.push({ id: p.id, reason: "Reels are capped at 0 per day in this preset" });
+    for (const p of pools.reel) held.push({ id: p.id, reason: "This business has no daily Reel times" });
     pools.reel = [];
   }
   const short: Record<"post" | "reel", Shortage[]> = { post: [], reel: [] };
