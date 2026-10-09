@@ -34,3 +34,5 @@
 
 - Per-business publishing lives in brand_publishing (platforms + enabled, server-written only); brand_platform_enabled gates the trigger, claim and missed-marking, and the publisher re-checks canSend (src/lib/brand-publishing.ts) at send time — the global switch alone never enables a business.
 - checkMetaConnection is read-only (src/lib/meta-verify.ts: GETs only, token must belong to the expected Page, scopes per chosen platforms) and never creates publication rows; rows are queued only by the explicit setBrandPublishing owner action after a confirmed test — connecting can never start posting.
+- Businesses listed in INSTAGRAM_LOGIN_BRANDS (src/lib/brand-publishing.ts) connect via Instagram API with Instagram Login on graph.instagram.com (no Facebook Page, Instagram-only, META_<SLUG>_IG_ACCESS_TOKEN + IG_USER_ID, verified username/id match); all others keep Facebook Login unchanged — lets Page-less accounts post without touching existing connections.
+- Dry runs (src/lib/dry-run.ts via dryRunBrand) make zero Meta calls and write nothing; they are never proof of live posting.
