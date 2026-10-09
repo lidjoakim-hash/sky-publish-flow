@@ -1,10 +1,12 @@
 /** Minimal Meta Graph API client (server only). Credentials come from project secrets. */
-import { metaSecretNames } from "./brand-publishing";
+import { connectionMode, instagramLoginSecretNames, metaSecretNames } from "./brand-publishing";
 export interface MetaCreds {
   token: string;
   pageId: string;
   igUserId: string | null;
   version: string;
+  /** graph.facebook.com for Page tokens; graph.instagram.com for Instagram-Login tokens. */
+  host: "graph.facebook.com" | "graph.instagram.com";
 }
 
 export { metaSecretNames };
@@ -14,13 +16,20 @@ export { metaSecretNames };
  * only when the business posts to Instagram.
  */
 export function readMetaCreds(brand = "skyline", platforms: readonly string[] = ["instagram", "facebook"]): MetaCreds | null {
+  if (connectionMode(brand) === "instagram_login") {
+    if (!platforms.includes("instagram")) return null;
+    const m = instagramLoginSecretNames(brand);
+    const t = process.env[m.token], ig = process.env[m.igUserId];
+    if (!t || !ig) return null;
+    return { token: t, pageId: "", igUserId: ig, version: process.env["META_GRAPH_VERSION"] || "v23.0", host: "graph.instagram.com" };
+  }
   const n = metaSecretNames(brand);
   const token = process.env[n.token];
   const pageId = process.env[n.pageId];
   const igUserId = platforms.includes("instagram") ? process.env[n.igUserId] : undefined;
   if (!token || !pageId) return null;
   if (platforms.includes("instagram") && !igUserId) return null;
-  return { token, pageId, igUserId: igUserId ?? null, version: process.env["META_GRAPH_VERSION"] || "v23.0" };
+  return { token, pageId, igUserId: igUserId ?? null, version: process.env["META_GRAPH_VERSION"] || "v23.0", host: "graph.facebook.com" };
 }
 
 export class MetaError extends Error {
@@ -45,7 +54,7 @@ export async function graph<T = Record<string, unknown>>(
   path: string,
   params: Record<string, string | undefined> = {},
 ): Promise<T> {
-  const url = new URL(`https://graph.facebook.com/${c.version}/${path.replace(/^\//, "")}`);
+  const url = new URL(`https://${c.host ?? "graph.facebook.com"}/${c.version}/${path.replace(/^\//, "")}`);
   const body = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v != null) (method === "GET" ? url.searchParams : body).set(k, v);
   let res: Response;

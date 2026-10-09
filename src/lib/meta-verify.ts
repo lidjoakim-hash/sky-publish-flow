@@ -49,3 +49,33 @@ export async function verifyMetaConnection(
   const where = wantIg ? `${page.name} and @${ig?.username ?? ig?.id}` : `${page.name} (Facebook only)`;
   return { ...out, status: "connected", message: `Connected to ${where}. Posting stays paused until you turn it on for this business.` };
 }
+
+/**
+ * Read-only check for an Instagram-Login business (graph.instagram.com, no Facebook Page).
+ * The token's account must be a professional account whose id AND username match the expected ones.
+ * Publish permission is probed with the read-only content_publishing_limit endpoint — never a publish call.
+ */
+export async function verifyInstagramLogin(
+  get: GraphGet,
+  cfg: { igUserId: string; expectedUsername: string },
+): Promise<VerifyResult> {
+  const me = await get<{ id?: string; user_id?: string; username?: string; account_type?: string }>("me", { fields: "user_id,username,account_type" });
+  const id = me.user_id ?? me.id ?? "";
+  const username = (me.username ?? "").toLowerCase();
+  const base = { page_id: undefined, page_name: undefined, ig_user_id: id || null, ig_username: me.username ?? null, token_expires_at: null };
+  if (username !== cfg.expectedUsername.toLowerCase()) {
+    return { ...base, status: "error", message: `The token belongs to @${me.username ?? "unknown"}, not @${cfg.expectedUsername}.` };
+  }
+  if (id !== cfg.igUserId) {
+    return { ...base, status: "error", message: `The saved Instagram account id (${cfg.igUserId}) does not match @${me.username} (${id}).` };
+  }
+  if (me.account_type && !["BUSINESS", "MEDIA_CREATOR"].includes(me.account_type)) {
+    return { ...base, status: "error", message: `@${me.username} is a ${me.account_type} account. It must be a Business or Creator account.` };
+  }
+  try {
+    await get(`${id}/content_publishing_limit`, { fields: "quota_usage" });
+  } catch (e) {
+    return { ...base, scopes: ["instagram_business_basic"], status: "error", message: `@${me.username} found, but publishing permission (instagram_business_content_publish) is missing or not approved: ${(e as Error).message}` };
+  }
+  return { ...base, scopes: ["instagram_business_basic", "instagram_business_content_publish"], status: "connected", message: `Connected to @${me.username} (Instagram only, no Facebook Page). Posting stays paused until you turn it on for this business.` };
+}

@@ -170,6 +170,7 @@ async function stepInstagram(admin: Admin, c: MetaCreds, pub: Pub) {
 }
 
 async function stepFacebook(admin: Admin, c: MetaCreds, pub: Pub) {
+  if (!c.pageId || c.host !== "graph.facebook.com") throw new MetaError("Facebook is not set up for this business", "permanent");
   if (pub.status === "pending" || pub.status === "retry") {
     const { asset, url } = await mediaUrls(admin, pub.asset_id);
     await set(admin, pub.id, { status: "sending", intent_at: new Date().toISOString(), attempts: pub.attempts + 1 });

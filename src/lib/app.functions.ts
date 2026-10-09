@@ -32,6 +32,20 @@ export const checkMetaConnection = createServerFn({ method: "POST" })
       await save({ status: "not_connected", last_error: "Meta secrets for this business are not set yet" });
       return { status: "not_connected" as const, message: `Add ${requiredSecrets(brand, platforms).join(", ")} as secrets.` };
     }
+    const { connectionMode, INSTAGRAM_LOGIN_BRANDS } = await import("./brand-publishing");
+    if (connectionMode(brand) === "instagram_login") {
+      const { verifyInstagramLogin } = await import("./meta-verify");
+      try {
+        const r = await verifyInstagramLogin((path, params) => graph(c, "GET", path, params), { igUserId: c.igUserId!, expectedUsername: INSTAGRAM_LOGIN_BRANDS[brand].expectedUsername });
+        const { message, ...rest } = r;
+        await save({ ...rest, last_error: r.status === "connected" ? null : message });
+        return { status: r.status, message };
+      } catch (e) {
+        const msg = (e as Error).message.replace(/access_token=[^&\s]+/g, "access_token=***");
+        await save({ status: "error", last_error: msg });
+        return { status: "error" as const, message: msg };
+      }
+    }
     try {
       const r = await verifyMetaConnection(
         (path, params) => graph(c, "GET", path, params.input_token === "__SELF__" ? { ...params, input_token: c.token } : params),
@@ -56,7 +70,7 @@ export const setBrandPlatforms = createServerFn({ method: "POST" })
   })
   .handler(async ({ context, data }) => {
     const { normalizePlatforms } = await import("./brand-publishing");
-    const platforms = normalizePlatforms(data.platforms);
+    const platforms = normalizePlatforms(data.platforms, data.brand);
     const { supabaseAdmin: admin } = await import("@/integrations/supabase/client.server");
     const { data: cur } = await admin.from("brand_publishing").select("enabled").eq("user_id", context.userId).eq("brand_slug", data.brand).maybeSingle();
     if (cur?.enabled) return { ok: false, message: "Pause posting for this business before changing its platforms." };
@@ -209,4 +223,34 @@ export const deleteAssets = createServerFn({ method: "POST" })
     if (de) throw de;
     const extra = kept.length ? ` Kept ${kept.length} that are sending right now: ${kept.join(", ")}.` : "";
     return { ok: true, deleted: doomed.length, message: `Deleted ${doomed.length} item${doomed.length === 1 ? "" : "s"} permanently.${extra}` };
+  });
+
+/**
+ * Dry run for one business: resolves business → connection mode → account → platforms and checks the readiness
+ * of its next dated items. Makes ZERO Meta calls and writes nothing (no queue, no status). Not proof of live posting.
+ */
+export const dryRunBrand = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { brand: string }) => {
+    if (!d || !SLUG.test(d.brand)) throw new Error("Invalid business");
+    return d;
+  })
+  .handler(async ({ context, data }) => {
+    const { buildDryRun } = await import("./dry-run");
+    const { connectionMode, requiredSecrets, DEFAULT_PLATFORMS } = await import("./brand-publishing");
+    const { supabase } = context;
+    const brand = data.brand;
+    const [{ data: bp }, { data: conn }, { data: st }, { data: assets }] = await Promise.all([
+      supabase.from("brand_publishing").select("platforms, enabled").eq("brand_slug", brand).maybeSingle(),
+      supabase.from("meta_connection").select("status, ig_username, ig_user_id, page_name").eq("brand_slug", brand).maybeSingle(),
+      supabase.from("settings").select("publishing_active, timezone").maybeSingle(),
+      supabase.from("assets").select("*").eq("brand_slug", brand).eq("skipped", false).not("scheduled_at", "is", null).gt("scheduled_at", new Date().toISOString()).order("scheduled_at").limit(10),
+    ]);
+    const platforms = bp?.platforms?.length ? bp.platforms : (DEFAULT_PLATFORMS[brand] ?? []);
+    // Secret presence only (booleans) — values never leave the server.
+    const secretsPresent = Object.fromEntries(requiredSecrets(brand, platforms).map((n) => [n, !!process.env[n]]));
+    return buildDryRun({
+      brand, mode: connectionMode(brand), platforms, enabled: !!bp?.enabled, globalActive: !!st?.publishing_active,
+      timeZone: st?.timezone ?? "Europe/Oslo", connection: conn ?? null, secretsPresent, assets: (assets ?? []) as never,
+    });
   });

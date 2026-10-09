@@ -95,9 +95,9 @@ describe("connection check does not queue or post", () => {
 
 import { DEFAULT_PLATFORMS as DP } from "@/lib/brand-publishing";
 import { BRAND_DEFAULTS as BD } from "@/lib/strategy";
-describe("Norge_no business", () => {
+describe("Norge business", () => {
   it("exists as its own business and defaults to Instagram only", () => {
-    expect(BD.some((b) => b.slug === "norge" && b.name === "Norge_no")).toBe(true);
+    expect(BD.some((b) => b.slug === "norge" && b.name === "Norge")).toBe(true);
     expect(DP.norge).toEqual(["instagram"]);
   });
 });

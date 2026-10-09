@@ -1,0 +1,10 @@
+## src/lib rules
+- Render progress is presentation-only, derived from persisted job progress; time estimates use observed worker updates and pause when stale — animation must never simulate completed work.
+- Pure rules (CSV parsing, caption matching, Oslo scheduling, ZIP safety, audio levels) live in src/lib/*.ts without I/O and are covered by src/test/core-rules.test.ts.
+- Strategy rules (bucket vocabulary, keyword suggestions, source grouping) live in src/lib/strategy.ts; the strategy-aware planner is src/lib/planner.ts, wrapped by planWithStrategy in src/lib/plan.ts and covered by src/test/strategy-rules.test.ts.
+- Weight advice (src/lib/feedback.ts) uses medians and a minimum sample, enforces step bounds and the diversity floor on the final shares, keeps unsampled weights exact and returns current weights untouched when evidence or settings are insufficient; and is applied only by explicit owner action logged in strategy_changes.
+- Idea briefs are template-based (src/lib/ideas.ts), stored in content_drafts, never overwrite assets.caption and are never scheduled.
+- Reel audio modes live in src/lib/reel-audio.ts: Meta's publishing API cannot pick Instagram music-library/trending sounds, so "Auto — Trending" modes publish the Reel's own/licensed audio; "Finish in Instagram" Reels get IG status needs_finish (never auto-sent) while Facebook still posts — never fake trending audio.
+- Camera-motion rating: the worker sends scene-score summaries with probe jobs, src/lib/motion.ts classifies them server-side (tested in src/test/motion.test.ts); flagged Reels are only skipped by an explicit owner action, never deleted — the thresholds are estimates.
+- Imports run from src/lib/import-store.ts (tab-wide store), not the Add batch page, so uploads survive page/business switches; the business is fixed when an import starts and dedupe is per business.
+- Dry runs (src/lib/dry-run.ts via dryRunBrand) make zero Meta calls and write nothing; they are never proof of live posting.
