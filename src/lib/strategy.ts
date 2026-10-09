@@ -59,6 +59,7 @@ export const BRAND_DEFAULTS = [
   },
   { slug: "lidverk", name: "Lidverk", language: "en", voice: "Clear, helpful and direct. Only claims the owner has verified.", focus: "Lidverk — owner to describe services and offers." },
   { slug: "speakfluent", name: "Speak Fluent", language: "en", voice: "Friendly, encouraging and clear. Only claims the owner has verified.", focus: "Language learning — owner to describe courses and offers." },
+  { slug: "norge", name: "Norge_no", language: "nb", voice: "Norsk bokmål. Tydelig og vennlig. Kun påstander eieren har bekreftet.", focus: "Instagram account @Norge_no — owner to describe content and goals." },
   { slug: "tekstilrens", name: "Tekstilrens Stavanger", language: "nb", voice: "Norsk bokmål. Saklig og vennlig. Vis ekte arbeid i Stavanger.", focus: "Textile cleaning in Stavanger — owner to describe services and prices." },
 ] as const;
 

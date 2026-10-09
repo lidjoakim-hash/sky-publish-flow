@@ -30,7 +30,7 @@ export function requiredScopes(platforms: readonly string[]): string[] {
 }
 
 /** Defaults when a business has no explicit row yet: nothing enabled, platform list must be chosen. */
-export const DEFAULT_PLATFORMS: Record<string, Platform[]> = { skyline: ["instagram", "facebook"], lidverk: ["facebook"] };
+export const DEFAULT_PLATFORMS: Record<string, Platform[]> = { skyline: ["instagram", "facebook"], lidverk: ["facebook"], norge: ["instagram"] };
 
 export function normalizePlatforms(p: unknown): Platform[] {
   if (!Array.isArray(p)) throw new Error("Choose at least one platform");
