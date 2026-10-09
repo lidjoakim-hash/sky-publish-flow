@@ -1,5 +1,5 @@
 import { useBrandConnection , useBrandAssets, useBrandPublications } from "@/components/brand";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Film, Image as ImageIcon, AlertTriangle, ArrowDownToLine, XCircle, Heart, MessageCircle, Send, Bookmark, ThumbsUp, Share2 } from "lucide-react";
@@ -68,7 +68,10 @@ function NextPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="font-display text-2xl font-bold sm:text-3xl">Up next</h1>
+      <div className="flex items-baseline justify-between gap-2">
+        <h1 className="font-display text-2xl font-bold sm:text-3xl">Up next</h1>
+        <Link to="/health" className="text-sm font-medium text-primary underline">Check all businesses</Link>
+      </div>
 
       <div className={cn("mt-4 rounded-2xl border p-4 shadow-card", run.days <= 7 ? "border-warning bg-warning/10" : "bg-card")}>
         <div className="flex items-baseline gap-2">
