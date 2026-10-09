@@ -1,5 +1,5 @@
 import { useBrandConnection , useBrandAssets, useBrandPublications } from "@/components/brand";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Film, Image as ImageIcon, AlertTriangle, ArrowDownToLine, XCircle, Heart, MessageCircle, Send, Bookmark, ThumbsUp, Share2 } from "lucide-react";
