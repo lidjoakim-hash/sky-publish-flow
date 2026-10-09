@@ -87,7 +87,7 @@ function ConnectionsPage() {
         {status === "connected" ? (
           <div className="space-y-1 text-sm">
             <p className="flex items-center gap-2"><CheckCircle2 className="size-4 text-success" /> {igLogin ? `Instagram: @${conn?.ig_username} (no Facebook Page)` : `Page: ${conn?.page_name}`}{igLogin ? "" : ""}{igLogin ? "" : wantIg ? ` · Instagram: @${conn?.ig_username ?? conn?.ig_user_id}` : " · Instagram: not used"}</p>
-            <p className="text-muted-foreground">Token expires: {conn?.token_expires_at ? new Date(conn.token_expires_at).toLocaleDateString("nb-NO") : "does not expire (or unknown)"}</p>
+            <p className="text-muted-foreground">Token expires: {conn?.token_expires_at ? new Date(conn.token_expires_at).toLocaleDateString("nb-NO") : "Expiry unknown"}</p>
             {expSoon && <p className="flex items-center gap-2 text-warning-foreground"><AlertTriangle className="size-4" /> The token expires within a week. Replace it to avoid a pause.</p>}
           </div>
         ) : (
@@ -141,7 +141,7 @@ function ConnectionsPage() {
             <p className="text-muted-foreground">{brandName} is paused. The main publishing switch does not turn it on — only this button does.</p>
             <label className="flex items-start gap-2">
               <input type="checkbox" className="mt-1" checked={testOk} onChange={(e) => setTestOk(e.target.checked)} />
-              <span>I have reviewed a draft or non-public test post for {brandName} and the Page is correct.</span>
+              <span>I have reviewed a draft or non-public test post for {brandName} and the {igLogin ? "Instagram account" : "Page"} is correct.</span>
             </label>
             <Button variant="teal" onClick={() => act(() => toggle({ data: { brand: slug, enabled: true, testConfirmed: testOk } }))} disabled={busy || status !== "connected" || !testOk}>
               Turn on posting for {brandName}
