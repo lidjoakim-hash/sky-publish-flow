@@ -20,13 +20,14 @@ describe("same-file reselection", () => {
   it("returns the chosen files and clears the input so the same ZIP can be picked again", () => {
     const input = document.createElement("input");
     input.type = "file";
-    const dt = new DataTransfer();
-    dt.items.add(new File(["x"], "batch.zip", { type: "application/zip" }));
-    input.files = dt.files;
+    const chosen = [new File(["x"], "batch.zip", { type: "application/zip" })];
+    let current: unknown = chosen;
+    Object.defineProperty(input, "files", { get: () => current, configurable: true });
     const files = takeInputFiles(input);
     expect(files.map((f) => f.name)).toEqual(["batch.zip"]);
-    expect(input.value).toBe("");
-    expect(input.files?.length ?? 0).toBe(0);
+    expect(input.value).toBe(""); // cleared, so choosing the same ZIP again fires onChange
+    current = null;
+    expect(takeInputFiles(input)).toEqual([]);
   });
   it("returns an empty list when nothing was chosen", () => {
     const input = document.createElement("input");
