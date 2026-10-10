@@ -52,6 +52,7 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
   --color-teal: var(--teal);
+  --color-post: var(--post);
   --color-teal-foreground: var(--teal-foreground);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
@@ -87,6 +88,7 @@
   --accent: oklch(0.94 0.04 190);
   --accent-foreground: oklch(0.35 0.08 195);
   --teal: oklch(0.62 0.11 190);
+  --post: oklch(0.52 0.19 258);
   --teal-foreground: oklch(0.99 0 0);
   --success: oklch(0.6 0.13 160);
   --success-foreground: oklch(0.99 0 0);
