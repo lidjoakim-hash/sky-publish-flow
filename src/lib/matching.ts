@@ -23,7 +23,10 @@ export function isExcludedName(path: string): boolean {
   const b = baseName(path).toLowerCase();
   if (/\.(html?|htm|ds_store|ini|db)$/i.test(b) || b.startsWith("._") || b === "thumbs.db") return true;
   if (normPath(path).split("/").some((s) => s === "__MACOSX")) return true;
-  return /(^|[_\-. ])(preview|contact[_-]?sheet|thumbnail)s?([_\-. ]|$)/i.test(b);
+  if (/(^|[_\-. ])(preview|contact[_-]?sheet|thumbnail|collection[_-]?preview)s?([_\-. ]|$)/i.test(b)) return true;
+  // Review/overview sheets such as "Reels_Review.jpg" or "B16_Review.jpg": "review" as the final word only,
+  // so ordinary marketing files like "customer_review_story.jpg" are kept.
+  return /(^|[_\-. ])review$/i.test(stem(b));
 }
 
 /** Classifies every file. Images sharing a stem with a video in the same folder are Reel covers. */

@@ -109,7 +109,7 @@ function CalendarPage() {
   }
 
   async function apply(mode: "append" | "reschedule" | "missed") {
-    if (start <= osloDateKey(new Date()) && mode !== "missed") return toast.error("Choose a future start date.");
+    if (start < osloDateKey(new Date()) && mode !== "missed") return toast.error("Choose today or a later start date.");
     if (!(await saveSettings())) return;
     const res = planWithStrategy({ assets: allAssets, pubs: allPubs, startDate: mode === "missed" ? tomorrow : start, postTimes, reelTime: reelTimes[0] ?? "19:00", timeZone: settings?.timezone ?? "Europe/Oslo", topicMixing: mixing, mode, brand: slug, strategy: { ...strategy, schedule: { postTimes: [...postTimes].sort(), reelTimes: [...reelTimes].sort() } } });
     if (!res.assignments.size && !res.held.length) return toast("Nothing to schedule.");
