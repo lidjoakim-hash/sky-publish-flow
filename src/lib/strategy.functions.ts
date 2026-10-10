@@ -47,7 +47,7 @@ export const commitSchedule = createServerFn({ method: "POST" })
     if (se || be || !settings) throw new Error("Could not read settings; nothing was saved.");
     const today = osloDateKey(new Date());
     const startDate = data.mode === "missed" ? addDays(today, 1) : data.startDate;
-    if (startDate <= today) throw new Error("Choose a future start date.");
+    if (startDate < today) throw new Error("Choose today or a later start date.");
     const plan = planWithStrategy({
       assets, pubs, startDate, mode: data.mode, brand: data.brand,
       postTimes: settings.post_times?.length ? settings.post_times : [settings.post_time],
