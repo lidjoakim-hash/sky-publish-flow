@@ -184,6 +184,12 @@ function buildPlan(entries: Entry[], texts: Map<string, string>): ImportPlan {
   return { roles, csvRows, csvDir, txt, order, warnings };
 }
 
+/** Resume progress: planned entries already finished in this batch count as completed. */
+export function countDoneInPlan(donePaths: Iterable<string>, planOrder: string[]) {
+  const done = new Set(donePaths);
+  return planOrder.filter((p) => done.has(p)).length;
+}
+
 export interface RunOptions {
   batchId: string;
   userId: string;
@@ -226,7 +232,8 @@ export async function runImport(source: { kind: "files"; files: File[] } | { kin
   const coverByKey = new Map<string, string>();
   const reelIdByKey = new Map<string, string>();
   const orderIndex = new Map(plan.order.map((p, i) => [p, i]));
-  let processed = 0;
+  // Resume: entries already finished in this batch count toward progress from the start.
+  let processed = countDoneInPlan(doneInBatch, plan.order);
 
   const handle = async (path: string, data: Blob | Uint8Array) => {
     const role = plan.roles.get(path);
@@ -251,6 +258,7 @@ export async function runImport(source: { kind: "files"; files: File[] } | { kin
     }
     if (shaSeen.has(sha)) {
       cb.onFile({ path, role, status: "duplicate", note: "Same file content already in library" });
+      processed++; // intentional duplicate skip counts as completed, errors never do
       return;
     }
     shaSeen.add(sha);
