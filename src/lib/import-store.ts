@@ -45,7 +45,7 @@ export const importStore = {
         onFile: (p) => set({ files: new Map(state.files).set(p.path, p) }),
         onLog: (msg) => set({ log: [...state.log, msg] }),
       });
-      set({ result: { kind: "done", message: `Import finished: ${r.planned} media files checked, ${r.captions} caption rows read.` } });
+      set({ result: { kind: "done", message: `Import finished: ${r.planned} media files checked, ${r.captions} caption rows read.${r.warnings.length ? ` Warning: ${r.warnings.join(" ")}` : ""}` } });
     } catch (e) {
       if ((e as Error).name === "AbortError") set({ result: { kind: "stopped", message: "Import stopped. Choose the same files again to resume." } });
       else set({ result: { kind: "error", message: (e as Error).message }, log: [...state.log, `Stopped: ${(e as Error).message}. Try the folder option if the archive is too large for this browser.`] });
