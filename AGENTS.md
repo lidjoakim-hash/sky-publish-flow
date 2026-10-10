@@ -10,6 +10,7 @@
 <!-- LOVABLE:END -->
 
 ## Architecture rules
+- Up next calendar grouping and date arithmetic are pure browser-safe rules in src/lib/next-calendar.ts; its view consumes brand-filtered assets and persisted publication states without scheduling writes.
 - Import runs in the browser (src/lib/importer.ts): ZIPs are streamed entry-by-entry with fflate; never send archives to server functions — Workers have short limits and small memory.
 - Publishing is a per-(asset, platform) state machine in src/lib/publisher.server.ts, claimed via the claim_publications DB lease; intent is persisted before each Meta write and interrupted sends become "unknown".
 - publications and meta_connection are written only server-side (admin client); clients can only read them — status cannot be faked from the browser.
