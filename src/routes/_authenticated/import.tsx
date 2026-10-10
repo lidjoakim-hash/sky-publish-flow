@@ -128,9 +128,9 @@ function ImportPage() {
               <span className="text-xs font-normal text-muted-foreground">Read one file at a time</span>
             </Button>
           </div>
-          <input ref={folderRef} type="file" className="hidden" multiple {...({ webkitdirectory: "", directory: "" } as Record<string, string>)} onChange={(e) => e.target.files && start({ kind: "files", files: [...e.target.files] })} />
-          <input ref={filesRef} type="file" className="hidden" multiple accept=".mp4,.mov,.m4v,.jpg,.jpeg,.png,.webp,.csv,.txt" onChange={(e) => e.target.files && start({ kind: "files", files: [...e.target.files] })} />
-          <input ref={zipRef} type="file" className="hidden" accept=".zip" onChange={(e) => e.target.files?.[0] && start({ kind: "zip", file: e.target.files[0] })} />
+          <input ref={folderRef} type="file" className="hidden" multiple {...({ webkitdirectory: "", directory: "" } as Record<string, string>)} onChange={(e) => { const fs = takeInputFiles(e.currentTarget); if (fs.length) start({ kind: "files", files: fs }); }} />
+          <input ref={filesRef} type="file" className="hidden" multiple accept=".mp4,.mov,.m4v,.jpg,.jpeg,.png,.webp,.csv,.txt" onChange={(e) => { const fs = takeInputFiles(e.currentTarget); if (fs.length) start({ kind: "files", files: fs }); }} />
+          <input ref={zipRef} type="file" className="hidden" accept=".zip" onChange={(e) => { const [f] = takeInputFiles(e.currentTarget); if (f) start({ kind: "zip", file: f }); }} />
           {resumeId && !running && (
             <p className="mt-3 text-xs text-muted-foreground">
               Choosing files again adds to the same batch and skips files that already finished.{" "}
@@ -206,6 +206,13 @@ function ImportPage() {
       </div>
     </div>
   );
+}
+
+/** Captures the chosen files and clears the input, so picking the same file again re-triggers onChange (resume). */
+export function takeInputFiles(input: HTMLInputElement): File[] {
+  const files = [...(input.files ?? [])];
+  input.value = "";
+  return files;
 }
 
 /** Walks dropped folders and keeps each file's folder path (needed for caption matching and First_Campaign). */
