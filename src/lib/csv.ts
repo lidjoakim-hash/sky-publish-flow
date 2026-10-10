@@ -41,18 +41,26 @@ export interface CaptionRow {
   caption: string;
 }
 
-/** Parses a Captions.csv with header Asset,Type,Caption (case-insensitive). */
+/**
+ * Parses a caption CSV (case-insensitive headers). Accepts "Asset,Type,Caption" and creator exports
+ * "Path,File,Type,Caption" (non-empty Path preferred, File as fallback). Throws a readable error when
+ * the caption column or every path column is missing.
+ */
 export function parseCaptionCsv(text: string): CaptionRow[] {
   const rows = parseCsv(text);
   if (!rows.length) return [];
   const header = rows[0].map((h) => h.trim().toLowerCase());
+  const pi = header.indexOf("path");
+  const fi = header.indexOf("file");
   const ai = header.indexOf("asset");
   const ti = header.indexOf("type");
   const ci = header.indexOf("caption");
-  if (ai < 0 || ci < 0) throw new Error("Captions.csv needs Asset and Caption columns");
+  if (ci < 0 || (ai < 0 && pi < 0 && fi < 0))
+    throw new Error("Caption CSV needs a Caption column and an Asset, Path or File column");
+  const cell = (r: string[], i: number) => (i >= 0 ? (r[i] ?? "").trim() : "");
   return rows.slice(1).map((r) => ({
-    asset: (r[ai] ?? "").trim(),
-    type: ti >= 0 ? (r[ti] ?? "").trim() : "",
+    asset: cell(r, pi) || cell(r, fi) || cell(r, ai),
+    type: cell(r, ti),
     caption: r[ci] ?? "",
   }));
 }

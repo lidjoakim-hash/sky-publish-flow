@@ -160,26 +160,28 @@ export interface ImportPlan {
   csvDir: string;
   txt: Map<string, string>;
   order: string[];
+  warnings: string[];
 }
 
 function buildPlan(entries: Entry[], texts: Map<string, string>): ImportPlan {
   const roles = classifyFiles(entries);
   let csvRows: CaptionRow[] = [];
   let csvDir = "";
+  const warnings: string[] = [];
   const csvs = [...roles].filter(([, r]) => r === "caption_csv").map(([p]) => p).sort((a, b) => a.split("/").length - b.split("/").length);
   for (const p of csvs) {
     try {
       const rows = parseCaptionCsv(texts.get(p) ?? "");
       if (!csvRows.length) csvDir = dirOf(p);
       csvRows = csvRows.concat(rows);
-    } catch {
-      /* not a caption CSV */
+    } catch (e) {
+      warnings.push(`Captions not read from ${p}: ${(e as Error).message}`);
     }
   }
   const txt = new Map<string, string>();
   for (const [p, r] of roles) if (r === "caption_txt") txt.set(p.toLowerCase(), (texts.get(p) ?? "").trim());
   const order = importOrder([...roles].filter(([, r]) => r === "reel" || r === "post" || r === "cover").map(([p]) => p));
-  return { roles, csvRows, csvDir, txt, order };
+  return { roles, csvRows, csvDir, txt, order, warnings };
 }
 
 export interface RunOptions {
@@ -212,6 +214,7 @@ export async function runImport(source: { kind: "files"; files: File[] } | { kin
     }
   }
   const plan = buildPlan(entries, texts);
+  for (const w of plan.warnings) cb.onLog(`⚠ ${w}`);
   for (const [p, r] of plan.roles) if (r === "excluded") cb.onFile({ path: p, role: r, status: "excluded" });
   for (const p of plan.order) cb.onFile({ path: p, role: plan.roles.get(p)!, status: "queued" });
 
@@ -329,5 +332,5 @@ export async function runImport(source: { kind: "files"; files: File[] } | { kin
     if (id) await supabase.from("assets").update({ cover_path: cp }).eq("id", id);
   }
   await supabase.from("batches").update({ status: "imported", processed_files: processed }).eq("id", opts.batchId);
-  return { planned: plan.order.length, captions: plan.csvRows.length };
+  return { planned: plan.order.length, captions: plan.csvRows.length, warnings: plan.warnings };
 }
