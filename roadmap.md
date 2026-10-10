@@ -1,0 +1,3 @@
+- [ ] Add brand-scoped Up next calendar and daily agenda with truthful statuses.
+- [ ] Improve phone preview sizing and verify mobile/desktop navigation and overflow.
+- [ ] Run focused tests and inspect preview build results; do not publish.
