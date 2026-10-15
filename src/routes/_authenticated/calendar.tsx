@@ -12,8 +12,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Empty, PageHeader, Panel, PubBadge } from "@/components/app-ui";
+import { AssetPreviewDialog } from "@/components/asset-preview";
 import { supabase } from "@/integrations/supabase/client";
-import { assetsQuery, publicationsQuery, settingsQuery } from "@/lib/queries";
+import { assetsQuery, publicationsQuery, settingsQuery, type Asset } from "@/lib/queries";
 import { TRENDING_LIMITATION, audioLabel, effectiveAudioMode } from "@/lib/reel-audio";
 import { addDays, formatOslo, osloDateKey } from "@/lib/schedule";
 import { planWithStrategy, lockedAssetIds } from "@/lib/plan";
@@ -28,7 +29,7 @@ import { validateBrandTimes } from "@/lib/publishing-rules";
 
 export const Route = createFileRoute("/_authenticated/calendar")({
   validateSearch: (s: Record<string, unknown>): { plan?: "new" } => (s.plan === "new" ? { plan: "new" } : {}),
-  head: () => ({ meta: [{ title: "Calendar — Skyline Publisher" }, { name: "description", content: "Plan and review the publishing schedule." }, { property: "og:title", content: "Calendar — Skyline Publisher" }, { property: "og:description", content: "Plan and review the publishing schedule." }] }),
+  head: () => ({ meta: [{ title: "Calendar — Skyline Publisher" }, { name: "description", content: "Plan and review the publishing schedule." }, { property: "og:title", content: "Calendar — Skyline Publisher" }, { property: "og:description", content: "Plan and review the publishing schedule." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   component: CalendarPage,
 });
 
@@ -54,6 +55,7 @@ function CalendarPage() {
   const [reelTimes, setReelTimes] = useState<string[]>(["19:00"]);
   const [mixing, setMixing] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [open, setOpen] = useState<Asset | null>(null);
   const [month, setMonth] = useState(osloDateKey(new Date()).slice(0, 7));
   const [ready, setReady] = useState(false);
   // Each business has its own daily times; until set, it uses the shared defaults.
@@ -229,11 +231,12 @@ function CalendarPage() {
           <TabsTrigger value="list">List</TabsTrigger>
           <TabsTrigger value="month">Month</TabsTrigger>
         </TabsList>
+        <p className="mt-2 text-xs text-muted-foreground">Tap any item to preview how it looks on Instagram and Facebook.</p>
         <TabsContent value="list">
           {!scheduled.length ? <Empty>No dates assigned yet.</Empty> : (
             <div className="divide-y rounded-xl border bg-card">
               {scheduled.map((a) => (
-                <div key={a.id} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
+                <Button key={a.id} variant="ghost" onClick={() => setOpen(a)} className="flex h-auto w-full flex-col gap-1 rounded-none px-4 py-3 text-left whitespace-normal hover:bg-accent/50 sm:flex-row sm:items-center sm:gap-4">
                   <div className="w-44 shrink-0 text-sm font-medium">{formatOslo(a.scheduled_at!)}</div>
                   <Badge variant={a.kind === "reel" ? "teal" : "muted"} className="w-fit">{a.kind === "reel" ? "Reel" : "Post"}</Badge>
                   <div className="min-w-0 flex-1 truncate text-sm">{a.file_name}</div>
