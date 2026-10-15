@@ -247,7 +247,7 @@ function CalendarPage() {
                     <span className="text-muted-foreground">IG</span><PubBadge status={pubBy.get(a.id)?.instagram} />
                     <span className="text-muted-foreground">FB</span><PubBadge status={pubBy.get(a.id)?.facebook} />
                   </div>
-                </div>
+                </Button>
               ))}
             </div>
           )}
@@ -265,9 +265,9 @@ function CalendarPage() {
               <div key={d} className="min-h-20 rounded-lg border bg-card p-1.5">
                 <div className="text-muted-foreground">{Number(d.slice(8))}</div>
                 {(byDay.get(d) ?? []).map((a) => (
-                  <div key={a.id} className={`mt-1 truncate rounded px-1 py-0.5 ${a.kind === "reel" ? "bg-accent text-accent-foreground" : "bg-secondary"}`} title={a.file_name}>
+                  <Button key={a.id} variant="ghost" onClick={() => setOpen(a)} title={`Preview ${a.file_name}`} className={`mt-1 h-auto w-full justify-center truncate rounded px-1 py-0.5 text-xs font-normal ${a.kind === "reel" ? "bg-accent text-accent-foreground" : "bg-secondary"}`}>
                     {a.kind === "reel" ? "Reel" : "Post"}
-                  </div>
+                  </Button>
                 ))}
               </div>
             ))}
@@ -276,6 +276,7 @@ function CalendarPage() {
       </Tabs>
 
       <PlanPreview preview={preview} assets={assets} onCancel={() => setPreview(null)} onCommit={commitPreview} />
+      <AssetPreviewDialog asset={open} assets={assets} pubs={pubs} onClose={() => setOpen(null)} />
       <AlertDialog open={confirm} onOpenChange={setConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
