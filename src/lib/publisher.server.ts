@@ -7,6 +7,7 @@
 import { graph, MetaError, readMetaCreds, ruploadFromUrl, type MetaCreds } from "./meta.server";
 import { missedAlertMessage } from "./publishing-rules";
 import { canSend } from "./brand-publishing";
+import { buildFeedPostParams, buildPhotoUploadParams, facebookPostFormat, feedPostNextAction } from "./facebook-feed";
 import { FINISH_MESSAGE, effectiveAudioMode, needsInstagramFinish, publishFile } from "./reel-audio";
 
 type Admin = Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"];
