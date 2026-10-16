@@ -197,6 +197,25 @@ async function stepFacebook(admin: Admin, c: MetaCreds, pub: Pub, brand = "skyli
     // Submission is not proof of publication: confirm via the API.
     const { data: a } = await admin.from("assets").select("kind").eq("id", pub.asset_id).single();
     if (a?.kind === "post") {
+      if (facebookPostFormat(brand) === "feed") {
+        const action = feedPostNextAction(pub);
+        if (action === "create_feed" && pub.container_id) {
+          // Feed format, step 2: create the feed post with the full caption and the uploaded photo attached.
+          // Intent is persisted first; an interrupted or ambiguous response becomes "unknown", never a blind retry.
+          const { data: asset } = await admin.from("assets").select("caption").eq("id", pub.asset_id).single();
+          await set(admin, pub.id, { status: "publishing", intent_at: new Date().toISOString() });
+          const r = await graph<{ id: string }>(c, "POST", `${c.pageId}/feed`, buildFeedPostParams(pub.container_id, asset?.caption ?? ""));
+          // Persist the feed post id immediately so this step can never run twice.
+          await set(admin, pub.id, { status: "processing", remote_id: r.id, next_attempt_at: new Date(Date.now() + 20000).toISOString(), lease_owner: null, lease_until: null });
+          return;
+        }
+        if (action === "upload_photo") throw new MetaError("Feed-format post lost its uploaded photo; review before retrying", "unknown");
+        // Confirm: only the real feed post id proves publication — never the photo id alone.
+        const p = await graph<{ id: string; permalink_url?: string; is_published?: boolean }>(c, "GET", pub.remote_id!, { fields: "permalink_url,is_published" });
+        if (p.is_published === false) return later(admin, pub.id);
+        await set(admin, pub.id, { status: "published", permalink: p.permalink_url ?? null, published_at: new Date().toISOString(), lease_owner: null, lease_until: null, last_error: null });
+        return;
+      }
       const id = pub.remote_id ?? pub.container_id;
       const p = await graph<{ id: string; permalink_url?: string; is_published?: boolean }>(c, "GET", id, { fields: pub.remote_id ? "permalink_url,is_published" : "link" });
       if (pub.remote_id && p.is_published === false) return later(admin, pub.id);
