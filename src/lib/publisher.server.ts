@@ -242,16 +242,22 @@ const later = (admin: Admin, id: string) => set(admin, id, { next_attempt_at: ne
 async function handleError(admin: Admin, pub: Pub, e: unknown, brand = "skyline") {
   const err = e instanceof MetaError ? e : new MetaError((e as Error).message ?? String(e), "unknown");
   const msg = err.message.slice(0, 500);
+  // Read the persisted status first — the in-memory pub is stale once intent has been saved mid-step.
+  const { data: cur } = await admin.from("publications").select("status, attempts").eq("id", pub.id).single();
+  const curStatus = cur?.status ?? pub.status;
+  const wasSending = curStatus === "sending" || curStatus === "publishing";
+  // Feed-format (Lidverk): once feed intent is persisted ("publishing"), any ambiguous outcome —
+  // including transient 5xx or auth — becomes "unknown", never an automatic retry that would
+  // re-upload the photo and create a duplicate feed post. Other brands are unchanged.
+  const feedIntent = feedErrorOutcome({ platform: pub.platform, brand, persistedStatus: curStatus }) === "unknown";
   if (err.kind === "auth") {
     await admin.from("settings").update({ publishing_active: false }).eq("user_id", pub.user_id);
     await admin.from("meta_connection").upsert({ user_id: pub.user_id, brand_slug: brand, status: "error", last_error: msg, checked_at: new Date().toISOString() });
-    await set(admin, pub.id, { status: pub.status === "sending" || pub.status === "publishing" ? "unknown" : "retry", last_error: msg, lease_owner: null, lease_until: null });
+    await set(admin, pub.id, { status: wasSending || feedIntent ? "unknown" : "retry", last_error: msg, lease_owner: null, lease_until: null });
     await alert(admin, pub.user_id, "error", "Publishing paused: the Meta access token was rejected or expired.");
     return;
   }
-  const { data: cur } = await admin.from("publications").select("status, attempts").eq("id", pub.id).single();
-  const wasSending = cur?.status === "sending" || cur?.status === "publishing";
-  if (err.kind === "unknown" || (wasSending && err.kind !== "permanent" && err.kind !== "transient")) {
+  if (err.kind === "unknown" || feedIntent || (wasSending && err.kind !== "permanent" && err.kind !== "transient")) {
     await set(admin, pub.id, { status: "unknown", last_error: msg, lease_owner: null, lease_until: null });
     await alert(admin, pub.user_id, "warning", `Needs review (${pub.platform}): ${msg}`);
     return;
