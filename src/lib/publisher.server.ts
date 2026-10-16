@@ -7,7 +7,7 @@
 import { graph, MetaError, readMetaCreds, ruploadFromUrl, type MetaCreds } from "./meta.server";
 import { missedAlertMessage } from "./publishing-rules";
 import { canSend } from "./brand-publishing";
-import { buildFeedPostParams, buildPhotoUploadParams, facebookPostFormat, feedPostNextAction } from "./facebook-feed";
+import { buildFeedPostParams, buildPhotoUploadParams, facebookPostFormat, feedConfirmOutcome, feedCreateGuard, feedErrorOutcome, feedPostNextAction } from "./facebook-feed";
 import { FINISH_MESSAGE, effectiveAudioMode, needsInstagramFinish, publishFile } from "./reel-audio";
 
 type Admin = Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"];
@@ -203,6 +203,12 @@ async function stepFacebook(admin: Admin, c: MetaCreds, pub: Pub, brand = "skyli
           // Feed format, step 2: create the feed post with the full caption and the uploaded photo attached.
           // Intent is persisted first; an interrupted or ambiguous response becomes "unknown", never a blind retry.
           const { data: asset } = await admin.from("assets").select("caption").eq("id", pub.asset_id).single();
+          // Legacy guard: rows created before the feed format hold an already-published photo id;
+          // attaching it to a new feed post would duplicate the existing post, so refuse for review.
+          const photo = await graph<{ is_published?: boolean }>(c, "GET", pub.container_id, { fields: "is_published" });
+          if (feedCreateGuard(photo) === "unknown") {
+            throw new MetaError("This item already exists as a published Facebook photo post; review it before retrying", "unknown");
+          }
           await set(admin, pub.id, { status: "publishing", intent_at: new Date().toISOString() });
           const r = await graph<{ id: string }>(c, "POST", `${c.pageId}/feed`, buildFeedPostParams(pub.container_id, asset?.caption ?? ""));
           // Persist the feed post id immediately so this step can never run twice.
@@ -212,7 +218,7 @@ async function stepFacebook(admin: Admin, c: MetaCreds, pub: Pub, brand = "skyli
         if (action === "upload_photo") throw new MetaError("Feed-format post lost its uploaded photo; review before retrying", "unknown");
         // Confirm: only the real feed post id proves publication — never the photo id alone.
         const p = await graph<{ id: string; permalink_url?: string; is_published?: boolean }>(c, "GET", pub.remote_id!, { fields: "permalink_url,is_published" });
-        if (p.is_published === false) return later(admin, pub.id);
+        if (feedConfirmOutcome(p) !== "published") return later(admin, pub.id);
         await set(admin, pub.id, { status: "published", permalink: p.permalink_url ?? null, published_at: new Date().toISOString(), lease_owner: null, lease_until: null, last_error: null });
         return;
       }
