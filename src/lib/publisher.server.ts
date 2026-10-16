@@ -7,7 +7,7 @@
 import { graph, MetaError, readMetaCreds, ruploadFromUrl, type MetaCreds } from "./meta.server";
 import { missedAlertMessage } from "./publishing-rules";
 import { canSend } from "./brand-publishing";
-import { buildFeedPostParams, buildPhotoUploadParams, facebookPostFormat, feedConfirmOutcome, feedCreateGuard, feedErrorOutcome, feedPostNextAction } from "./facebook-feed";
+import { buildFeedPostParams, buildPhotoUploadParams, facebookPostFormat, feedConfirmOnly, feedConfirmOutcome, feedCreateGuard, feedErrorOutcome, feedPostNextAction } from "./facebook-feed";
 import { FINISH_MESSAGE, effectiveAudioMode, needsInstagramFinish, publishFile } from "./reel-audio";
 
 type Admin = Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"];
@@ -170,8 +170,20 @@ async function stepInstagram(admin: Admin, c: MetaCreds, pub: Pub) {
   }
 }
 
-async function stepFacebook(admin: Admin, c: MetaCreds, pub: Pub, brand = "skyline") {
+export async function stepFacebook(admin: Admin, c: MetaCreds, pub: Pub, brand = "skyline") {
   if (!c.pageId || c.host !== "graph.facebook.com") throw new MetaError("Facebook is not set up for this business", "permanent");
+  // A saved feed post id always wins over pending/retry: after an ambiguous outcome the row may
+  // carry status "retry" while the feed post already exists at Meta — confirm it, never re-upload
+  // the photo or recreate the feed post. Runs before the upload branch; image posts only.
+  if (feedConfirmOnly(brand, pub)) {
+    const { data: a } = await admin.from("assets").select("kind").eq("id", pub.asset_id).single();
+    if (a?.kind === "post") {
+      const p = await graph<{ id: string; permalink_url?: string; is_published?: boolean }>(c, "GET", pub.remote_id!, { fields: "permalink_url,is_published" });
+      if (feedConfirmOutcome(p) !== "published") return later(admin, pub.id);
+      await set(admin, pub.id, { status: "published", permalink: p.permalink_url ?? null, published_at: new Date().toISOString(), lease_owner: null, lease_until: null, last_error: null });
+      return;
+    }
+  }
   if (pub.status === "pending" || pub.status === "retry") {
     const { asset, url } = await mediaUrls(admin, pub.asset_id);
     await set(admin, pub.id, { status: "sending", intent_at: new Date().toISOString(), attempts: pub.attempts + 1 });

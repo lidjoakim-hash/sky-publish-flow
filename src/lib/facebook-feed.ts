@@ -44,6 +44,15 @@ export function feedPostNextAction(p: FeedPostState): "upload_photo" | "create_f
 }
 
 /**
+ * Entry dispatch for stepFacebook: a feed-format image row that already holds a feed post id
+ * (remote_id) only confirms it — it must never re-enter the pending/retry upload branch,
+ * even after handleError set it back to "retry". Reels and other brands are unaffected.
+ */
+export function feedConfirmOnly(brand: string, p: FeedPostState): boolean {
+  return facebookPostFormat(brand) === "feed" && !!p.remote_id;
+}
+
+/**
  * Once feed intent is persisted (status "publishing"), any ambiguous outcome must become
  * "unknown" for review — a retry would re-upload the photo and create a duplicate feed post.
  * Returns "unknown" only for feed-format brands in that state; everything else keeps existing behavior.
