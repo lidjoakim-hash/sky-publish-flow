@@ -14,6 +14,7 @@
 - The Instagram/Facebook tap-to-preview dialog lives only in src/components/asset-preview.tsx; Up next passes withActions (swap/unapprove), Calendar opens it read-only — change the mockups in that file, never copy them.
 - Import runs in the browser (src/lib/importer.ts): ZIPs are streamed entry-by-entry with fflate; never send archives to server functions — Workers have short limits and small memory.
 - Publishing is a per-(asset, platform) state machine in src/lib/publisher.server.ts, claimed via the claim_publications DB lease; intent is persisted before each Meta write and interrupted sends become "unknown".
+- Facebook image posts: format is per brand via src/lib/facebook-feed.ts (pure rules, no I/O) — Lidverk publishes unpublished-photo + Page /feed with attached_media (feed post id persisted before confirmation, never re-created after an ambiguous response); all other brands keep the direct published photo upload.
 - publications and meta_connection are written only server-side (admin client); clients can only read them — status cannot be faked from the browser.
 - FFmpeg probing/rendering runs in the local worker (worker/render-worker.mjs) via /api/public/worker/* guarded by WORKER_SECRET; originals in storage are never overwritten, and deleted only by the owner-initiated deleteAssets server function (no storage delete policy for clients).
 - Meta credentials are server secrets, never stored in the database or browser.
