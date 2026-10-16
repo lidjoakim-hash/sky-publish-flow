@@ -98,7 +98,7 @@ export async function runPublisherTick(admin: Admin, owner: string, deadlineMs =
       await release();
       continue;
     }
-    await step(admin, creds, pub).catch((e) => handleError(admin, pub, e, brand));
+    await step(admin, creds, pub, brand).catch((e) => handleError(admin, pub, e, brand));
     report.processed++;
   }
   return report;
@@ -130,9 +130,9 @@ async function mediaUrls(admin: Admin, assetId: string) {
   return { asset: a, url: await sign(path), coverUrl: a.cover_path ? await sign(a.cover_path) : undefined };
 }
 
-async function step(admin: Admin, c: MetaCreds, pub: Pub) {
+async function step(admin: Admin, c: MetaCreds, pub: Pub, brand = "skyline") {
   if (pub.platform === "instagram") return stepInstagram(admin, c, pub);
-  return stepFacebook(admin, c, pub);
+  return stepFacebook(admin, c, pub, brand);
 }
 
 async function stepInstagram(admin: Admin, c: MetaCreds, pub: Pub) {
