@@ -39,7 +39,7 @@ function fakeAdmin(assetKind = "post") {
 const retryWithFeedId = {
   id: "pub1", user_id: "u1", asset_id: "a1", platform: "facebook",
   status: "retry", container_id: "photo123", remote_id: "feed456", attempts: 1,
-};
+} as const;
 
 describe("stepFacebook entry dispatch — a saved feed id is never re-uploaded", () => {
   beforeEach(() => {
