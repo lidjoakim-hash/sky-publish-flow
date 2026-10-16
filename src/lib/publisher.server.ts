@@ -170,14 +170,20 @@ async function stepInstagram(admin: Admin, c: MetaCreds, pub: Pub) {
   }
 }
 
-async function stepFacebook(admin: Admin, c: MetaCreds, pub: Pub) {
+async function stepFacebook(admin: Admin, c: MetaCreds, pub: Pub, brand = "skyline") {
   if (!c.pageId || c.host !== "graph.facebook.com") throw new MetaError("Facebook is not set up for this business", "permanent");
   if (pub.status === "pending" || pub.status === "retry") {
     const { asset, url } = await mediaUrls(admin, pub.asset_id);
     await set(admin, pub.id, { status: "sending", intent_at: new Date().toISOString(), attempts: pub.attempts + 1 });
     if (asset.kind === "post") {
-      const r = await graph<{ id: string; post_id?: string }>(c, "POST", `${c.pageId}/photos`, { url, message: asset.caption ?? "", published: "true" });
-      await set(admin, pub.id, { status: "processing", container_id: r.id, remote_id: r.post_id ?? null, next_attempt_at: new Date(Date.now() + 20000).toISOString(), lease_owner: null, lease_until: null });
+      if (facebookPostFormat(brand) === "feed") {
+        // Feed format, step 1: upload the photo unpublished; the caption goes on the feed post in step 2.
+        const r = await graph<{ id: string }>(c, "POST", `${c.pageId}/photos`, buildPhotoUploadParams(url));
+        await set(admin, pub.id, { status: "processing", container_id: r.id, remote_id: null, next_attempt_at: new Date(Date.now() + 20000).toISOString(), lease_owner: null, lease_until: null });
+      } else {
+        const r = await graph<{ id: string; post_id?: string }>(c, "POST", `${c.pageId}/photos`, { url, message: asset.caption ?? "", published: "true" });
+        await set(admin, pub.id, { status: "processing", container_id: r.id, remote_id: r.post_id ?? null, next_attempt_at: new Date(Date.now() + 20000).toISOString(), lease_owner: null, lease_until: null });
+      }
     } else {
       const start = await graph<{ video_id: string }>(c, "POST", `${c.pageId}/video_reels`, { upload_phase: "start" });
       await set(admin, pub.id, { container_id: start.video_id });
